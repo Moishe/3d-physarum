@@ -1,0 +1,55 @@
+# TODO - 3D Physarum Model Generator
+
+## Core Implementation Tasks
+
+### 1. Physarum Simulation Engine
+- [ ] Implement basic Physarum algorithm with actors/agents
+- [ ] Add physarum decay mechanics (multiple values per pixel)
+- [ ] Implement actor movement and sensing parameters
+- [ ] Add view radius and distance controls
+- [ ] Implement rate of decay parameter
+
+### 2. 3D Model Generation
+- [ ] Design 2D to 3D conversion (Z-axis as time progression)
+- [ ] Implement central "base" starting point constraint
+- [ ] Ensure upward-only growth from the base
+- [ ] Add connectivity validation (no disconnected pieces)
+- [ ] Convert simulation data to 3D mesh structure
+
+### 3. Command Line Interface
+- [ ] Create argument parser for simulation parameters
+- [ ] Add parameter validation
+- [ ] Implement help/usage documentation
+- [ ] Add configuration options for:
+  - Number of actors
+  - Rate of decay
+  - View radius
+  - View distance
+  - Output file names
+  - Simulation duration/steps
+
+### 4. File Output Generation
+- [ ] Implement STL file generation for 3D printing
+- [ ] Add 3D rendering to JPG functionality
+- [ ] Ensure proper file format compliance
+- [ ] Add error handling for file operations
+
+### 5. Testing and Validation
+- [ ] Create unit tests for Physarum algorithm
+- [ ] Test 3D model connectivity validation
+- [ ] Validate STL file output quality
+- [ ] Test command line parameter handling
+- [ ] Performance testing for large simulations
+
+### 6. Documentation and Polish
+- [ ] Add inline code documentation
+- [ ] Create usage examples
+- [ ] Optimize performance for large models
+- [ ] Add progress indicators for long simulations
+- [ ] Error handling and user feedback
+
+## Technical Considerations
+- Ensure efficient memory usage for large 3D models
+- Consider using numpy for numerical operations
+- Look into libraries for STL generation and 3D rendering
+- Plan for scalable simulation grid sizes
