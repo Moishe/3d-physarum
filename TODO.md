@@ -17,22 +17,24 @@
 - [x] Convert simulation data to 3D mesh structure
 
 ### 3. Command Line Interface
-- [ ] Create argument parser for simulation parameters
-- [ ] Add parameter validation
-- [ ] Implement help/usage documentation
-- [ ] Add configuration options for:
+- [x] Create argument parser for simulation parameters
+- [x] Add parameter validation
+- [x] Implement help/usage documentation
+- [x] Add configuration options for:
   - Number of actors
   - Rate of decay
   - View radius
   - View distance
   - Output file names
   - Simulation duration/steps
+  - Layer height and frequency
+  - Base radius and threshold
 
 ### 4. File Output Generation
-- [ ] Implement STL file generation for 3D printing
+- [x] Implement STL file generation for 3D printing
 - [ ] Add 3D rendering to JPG functionality
-- [ ] Ensure proper file format compliance
-- [ ] Add error handling for file operations
+- [x] Ensure proper file format compliance
+- [x] Add error handling for file operations
 
 ### 5. Testing and Validation
 - [ ] Create unit tests for Physarum algorithm
