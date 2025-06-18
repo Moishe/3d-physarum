@@ -6,6 +6,7 @@ import sys
 import os
 from physarum import PhysarumSimulation
 from model_3d import Model3DGenerator
+from model_3d_smooth import SmoothModel3DGenerator
 import numpy as np
 
 
@@ -19,6 +20,7 @@ Examples:
   %(prog)s --steps 200 --actors 100 --output my_model.stl
   %(prog)s --width 150 --height 150 --decay 0.02 --threshold 0.15
   %(prog)s --view-radius 5 --view-distance 15 --speed 1.5
+  %(prog)s --smooth --smoothing-iterations 3 --output smooth_model.stl
         """
     )
     
@@ -43,6 +45,8 @@ Examples:
     
     # 3D model parameters
     model_group = parser.add_argument_group('3D Model Parameters')
+    model_group.add_argument('--smooth', action='store_true',
+                            help='Use smooth surface generation (marching cubes) instead of voxels')
     model_group.add_argument('--layer-height', type=float, default=1.0, metavar='F',
                             help='Height of each layer in 3D model (default: 1.0)')
     model_group.add_argument('--threshold', type=float, default=0.1, metavar='F',
@@ -51,6 +55,8 @@ Examples:
                             help='Radius of the central base (default: 10)')
     model_group.add_argument('--layer-frequency', type=int, default=5, metavar='N',
                             help='Capture layer every N steps (default: 5)')
+    model_group.add_argument('--smoothing-iterations', type=int, default=2, metavar='N',
+                            help='Number of smoothing iterations for smooth surfaces (default: 2)')
     
     # Output parameters
     output_group = parser.add_argument_group('Output Parameters')
@@ -99,6 +105,8 @@ def validate_parameters(args):
         errors.append("Base radius must be non-negative")
     if args.layer_frequency <= 0:
         errors.append("Layer frequency must be positive")
+    if args.smoothing_iterations < 0:
+        errors.append("Smoothing iterations must be non-negative")
     
     # Output validation
     if not args.output.endswith('.stl'):
@@ -124,9 +132,12 @@ def run_simulation_with_3d_generation(args):
         print(f"View radius: {args.view_radius}")
         print(f"View distance: {args.view_distance}")
         print(f"Speed: {args.speed}")
+        print(f"Model type: {'Smooth (Marching Cubes)' if args.smooth else 'Voxel-based'}")
         print(f"Layer height: {args.layer_height}")
         print(f"Threshold: {args.threshold}")
         print(f"Base radius: {args.base_radius}")
+        if args.smooth:
+            print(f"Smoothing iterations: {args.smoothing_iterations}")
         print(f"Output file: {args.output}")
         print()
     
@@ -141,13 +152,22 @@ def run_simulation_with_3d_generation(args):
         speed=args.speed
     )
     
-    # Create 3D model generator
-    generator = Model3DGenerator(
-        simulation=simulation,
-        layer_height=args.layer_height,
-        threshold=args.threshold,
-        base_radius=args.base_radius
-    )
+    # Create 3D model generator (smooth or voxel-based)
+    if args.smooth:
+        generator = SmoothModel3DGenerator(
+            simulation=simulation,
+            layer_height=args.layer_height,
+            threshold=args.threshold,
+            base_radius=args.base_radius,
+            smoothing_iterations=args.smoothing_iterations
+        )
+    else:
+        generator = Model3DGenerator(
+            simulation=simulation,
+            layer_height=args.layer_height,
+            threshold=args.threshold,
+            base_radius=args.base_radius
+        )
     
     if not args.quiet:
         print("Running simulation and generating 3D model...")

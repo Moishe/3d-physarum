@@ -44,12 +44,14 @@
 - [ ] Performance testing for large simulations
 
 ### 6. 3D Model Smoothing and Surface Quality Enhancement
-- [ ] **Phase 1: Foundation - Replace Voxel Generation with Marching Cubes (High Priority)**
-  - [ ] Add required dependencies (scikit-image, open3d, trimesh)
-  - [ ] Create new smoothing module (`model_3d_smooth.py`)
-  - [ ] Implement volume generation from layer stack
-  - [ ] Integrate marching cubes surface extraction
-  - [ ] Maintain compatibility with existing STL export
+- [x] **Phase 1: Foundation - Replace Voxel Generation with Marching Cubes (High Priority)**
+  - [x] Add required dependencies (scikit-image, trimesh, scipy)
+  - [x] Create new smoothing module (`model_3d_smooth.py`)
+  - [x] Implement volume generation from layer stack
+  - [x] Integrate marching cubes surface extraction
+  - [x] Maintain compatibility with existing STL export
+  - [x] Add CLI support for smooth vs voxel generation modes
+  - [x] Write comprehensive tests for smooth model functionality
 - [ ] **Phase 2: Surface Smoothing and Refinement (High Priority)**
   - [ ] Implement Laplacian smoothing with configurable iterations
   - [ ] Add Taubin smoothing to prevent volume loss
