@@ -3,11 +3,11 @@
 ## Core Implementation Tasks
 
 ### 1. Physarum Simulation Engine
-- [ ] Implement basic Physarum algorithm with actors/agents
-- [ ] Add physarum decay mechanics (multiple values per pixel)
-- [ ] Implement actor movement and sensing parameters
-- [ ] Add view radius and distance controls
-- [ ] Implement rate of decay parameter
+- [x] Implement basic Physarum algorithm with actors/agents
+- [x] Add physarum decay mechanics (multiple values per pixel)
+- [x] Implement actor movement and sensing parameters
+- [x] Add view radius and distance controls
+- [x] Implement rate of decay parameter
 
 ### 2. 3D Model Generation
 - [ ] Design 2D to 3D conversion (Z-axis as time progression)
