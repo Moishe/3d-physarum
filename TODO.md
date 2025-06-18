@@ -10,11 +10,11 @@
 - [x] Implement rate of decay parameter
 
 ### 2. 3D Model Generation
-- [ ] Design 2D to 3D conversion (Z-axis as time progression)
-- [ ] Implement central "base" starting point constraint
-- [ ] Ensure upward-only growth from the base
-- [ ] Add connectivity validation (no disconnected pieces)
-- [ ] Convert simulation data to 3D mesh structure
+- [x] Design 2D to 3D conversion (Z-axis as time progression)
+- [x] Implement central "base" starting point constraint
+- [x] Ensure upward-only growth from the base
+- [x] Add connectivity validation (no disconnected pieces)
+- [x] Convert simulation data to 3D mesh structure
 
 ### 3. Command Line Interface
 - [ ] Create argument parser for simulation parameters
