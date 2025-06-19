@@ -53,8 +53,6 @@ Examples:
                             help='Height of each layer in 3D model (default: 1.0)')
     model_group.add_argument('--threshold', type=float, default=0.1, metavar='F',
                             help='Minimum trail strength for 3D inclusion (default: 0.1)')
-    model_group.add_argument('--base-radius', type=int, default=10, metavar='N',
-                            help='Radius of the central base (default: 10)')
     model_group.add_argument('--layer-frequency', type=int, default=5, metavar='N',
                             help='Capture layer every N steps (default: 5)')
     model_group.add_argument('--smoothing-iterations', type=int, default=2, metavar='N',
@@ -116,8 +114,6 @@ def validate_parameters(args):
         errors.append("Layer height must be positive")
     if args.threshold < 0:
         errors.append("Threshold must be non-negative")
-    if args.base_radius < 0:
-        errors.append("Base radius must be non-negative")
     if args.layer_frequency <= 0:
         errors.append("Layer frequency must be positive")
     if args.smoothing_iterations < 0:
@@ -156,7 +152,6 @@ def run_simulation_with_3d_generation(args):
         print(f"Model type: {'Smooth (Marching Cubes)' if args.smooth else 'Voxel-based'}")
         print(f"Layer height: {args.layer_height}")
         print(f"Threshold: {args.threshold}")
-        print(f"Base radius: {args.base_radius}")
         if args.smooth:
             print(f"Smoothing iterations: {args.smoothing_iterations}")
             print(f"Smoothing type: {args.smoothing_type}")
@@ -186,7 +181,6 @@ def run_simulation_with_3d_generation(args):
             simulation=simulation,
             layer_height=args.layer_height,
             threshold=args.threshold,
-            base_radius=args.base_radius,
             smoothing_iterations=args.smoothing_iterations,
             smoothing_type=args.smoothing_type,
             taubin_lambda=args.taubin_lambda,
@@ -198,8 +192,7 @@ def run_simulation_with_3d_generation(args):
         generator = Model3DGenerator(
             simulation=simulation,
             layer_height=args.layer_height,
-            threshold=args.threshold,
-            base_radius=args.base_radius
+            threshold=args.threshold
         )
     
     if not args.quiet:

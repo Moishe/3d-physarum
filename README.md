@@ -4,7 +4,7 @@ This application generates 3D models based on the Physarum slime mold algorithm.
 
 ## Features
 
-* **Central Base Growth**: The colony starts from a central "base" and can only grow upward. Movement along the Z-axis represents movement through time in a 2D physarum simulation.
+* **Time-Layered Growth**: Movement along the Z-axis represents movement through time in a 2D physarum simulation.
 * **Connected Structures**: The resulting model is completely self-connected with no disconnected pieces when considering the Z-axis.
 * **STL Output**: Generates .STL files suitable for 3D printing.
 * **Configurable Parameters**: Full control over simulation parameters including number of actors, decay rate, view radius and distance, etc.
@@ -47,7 +47,6 @@ This will create a file named `physarum_3d_model.stl` in the current directory.
 
 - `--layer-height F`: Height of each layer in 3D model (default: 1.0)
 - `--threshold F`: Minimum trail strength for 3D inclusion (default: 0.1)
-- `--base-radius N`: Radius of the central base (default: 10)
 - `--layer-frequency N`: Capture layer every N steps (default: 5)
 
 #### Output Parameters

@@ -17,8 +17,7 @@ def main():
         decay_rate=0.005,
         steps=50,
         layer_height=1.0,
-        threshold=0.15,
-        base_radius=8
+        threshold=0.15
     )
     
     print(f"Generated model with {generator.get_layer_count()} layers")

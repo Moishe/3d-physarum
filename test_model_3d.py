@@ -15,19 +15,17 @@ class TestModel3DGenerator:
     def setup_method(self):
         """Set up test fixtures."""
         self.sim = PhysarumSimulation(width=50, height=50, num_actors=10, decay_rate=0.01)
-        self.generator = Model3DGenerator(self.sim, layer_height=1.0, threshold=0.1, base_radius=5)
+        self.generator = Model3DGenerator(self.sim, layer_height=1.0, threshold=0.1)
     
     def test_initialization(self):
         """Test Model3DGenerator initialization."""
         assert self.generator.simulation == self.sim
         assert self.generator.layer_height == 1.0
         assert self.generator.threshold == 0.1
-        assert self.generator.base_radius == 5
         assert len(self.generator.layers) == 0
-        assert self.generator.base_center == (25, 25)  # Center of 50x50 grid
     
     def test_capture_layer_first_layer(self):
-        """Test capturing the first layer ensures base connectivity."""
+        """Test capturing the first layer uses only simulation data."""
         # Run simulation for a few steps
         self.sim.run(10)
         
@@ -37,16 +35,11 @@ class TestModel3DGenerator:
         assert len(self.generator.layers) == 1
         first_layer = self.generator.layers[0]
         
-        # Verify base area is solid
-        center_x, center_y = self.generator.base_center
-        base_radius = self.generator.base_radius
+        # Verify layer is based on simulation threshold, not artificial base
+        trail_map = self.sim.get_trail_map()
+        expected_layer = trail_map > self.generator.threshold
         
-        # Check that points within base radius are True
-        y_coords, x_coords = np.ogrid[:first_layer.shape[0], :first_layer.shape[1]]
-        distance_from_center = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
-        base_mask = distance_from_center <= base_radius
-        
-        assert np.all(first_layer[base_mask] == True), "Base area should be solid"
+        assert np.array_equal(first_layer, expected_layer), "First layer should match simulation data above threshold"
     
     def test_capture_multiple_layers(self):
         """Test capturing multiple layers."""
@@ -93,33 +86,39 @@ class TestModel3DGenerator:
     
     def test_upward_connectivity_validation(self):
         """Test that upward connectivity is enforced."""
-        # Create first layer with base
+        # Create first layer from simulation
         self.sim.run(5)
         self.generator.capture_layer()
+        first_layer = self.generator.layers[0]
         
         # Manually create a second layer with disconnected components
         second_layer = np.zeros((50, 50), dtype=bool)
         
-        # Add connected component overlapping with base
-        center_x, center_y = self.generator.base_center
-        second_layer[center_y-2:center_y+3, center_x-2:center_x+3] = True
+        # Find some area that exists in the first layer to create a connected component
+        first_layer_indices = np.where(first_layer)
+        if len(first_layer_indices[0]) > 0:
+            # Add connected component overlapping with first layer
+            y_idx, x_idx = first_layer_indices[0][0], first_layer_indices[1][0]
+            second_layer[y_idx:y_idx+3, x_idx:x_idx+3] = True
         
-        # Add disconnected component far from base
+        # Add disconnected component far from any existing structure
         second_layer[5:8, 5:8] = True
         
         # Test connectivity enforcement
         validated_layer = self.generator._ensure_upward_connectivity(second_layer)
         
         # Only the connected component should remain
-        assert np.any(validated_layer[center_y-2:center_y+3, center_x-2:center_x+3])
+        if len(first_layer_indices[0]) > 0:
+            y_idx, x_idx = first_layer_indices[0][0], first_layer_indices[1][0]
+            assert np.any(validated_layer[y_idx:y_idx+3, x_idx:x_idx+3])
         assert not np.any(validated_layer[5:8, 5:8])
     
     def test_validate_connectivity_valid_model(self):
         """Test connectivity validation for a valid model."""
         # Create a valid model with connected layers
-        center_x, center_y = self.generator.base_center
+        center_x, center_y = 25, 25  # Center of 50x50 grid
         
-        # First layer - base
+        # First layer
         first_layer = np.zeros((50, 50), dtype=bool)
         first_layer[center_y-5:center_y+6, center_x-5:center_x+6] = True
         self.generator.layers.append(first_layer)
@@ -135,16 +134,16 @@ class TestModel3DGenerator:
     def test_validate_connectivity_invalid_model(self):
         """Test connectivity validation for an invalid model."""
         # Create an invalid model with disconnected layers
-        center_x, center_y = self.generator.base_center
+        center_x, center_y = 25, 25  # Center of 50x50 grid
         
-        # First layer - base
+        # First layer
         first_layer = np.zeros((50, 50), dtype=bool)
         first_layer[center_y-5:center_y+6, center_x-5:center_x+6] = True
         self.generator.layers.append(first_layer)
         
         # Second layer - disconnected from first
         second_layer = np.zeros((50, 50), dtype=bool)
-        second_layer[5:8, 5:8] = True  # Far from base
+        second_layer[5:8, 5:8] = True  # Far from first layer
         self.generator.layers.append(second_layer)
         
         # Validation should fail
@@ -223,14 +222,13 @@ class TestGenerateFunction:
         """Test the high-level 3D model generation function."""
         generator = generate_3d_model_from_simulation(
             width=30, height=30, num_actors=5, decay_rate=0.02,
-            steps=25, layer_height=1.5, threshold=0.05, base_radius=3
+            steps=25, layer_height=1.5, threshold=0.05
         )
         
         # Verify generator was created properly
         assert isinstance(generator, Model3DGenerator)
         assert generator.layer_height == 1.5
         assert generator.threshold == 0.05
-        assert generator.base_radius == 3
         
         # Should have captured multiple layers (every 5th step + final)
         expected_layers = (25 // 5) + 1  # 5 + 1 = 6 layers
@@ -244,7 +242,7 @@ class TestGenerateFunction:
         # Test with different parameters
         generator = generate_3d_model_from_simulation(
             width=20, height=20, num_actors=3, decay_rate=0.01,
-            steps=15, layer_height=0.5, threshold=0.2, base_radius=2
+            steps=15, layer_height=0.5, threshold=0.2
         )
         
         assert generator.simulation.grid.width == 20
@@ -253,13 +251,12 @@ class TestGenerateFunction:
         assert generator.simulation.decay_rate == 0.01
         assert generator.layer_height == 0.5
         assert generator.threshold == 0.2
-        assert generator.base_radius == 2
     
     def test_generate_empty_simulation(self):
         """Test generation with minimal parameters."""
         generator = generate_3d_model_from_simulation(
             width=10, height=10, num_actors=1, decay_rate=0.1,
-            steps=5, layer_height=1.0, threshold=0.01, base_radius=1
+            steps=5, layer_height=1.0, threshold=0.01
         )
         
         # Should still create valid generator
@@ -286,7 +283,7 @@ class TestParameterValidation:
         """Test edge case parameters."""
         # Very small grid
         sim = PhysarumSimulation(width=5, height=5, num_actors=1, decay_rate=0.01)
-        generator = Model3DGenerator(sim, layer_height=0.1, threshold=0.01, base_radius=1)
+        generator = Model3DGenerator(sim, layer_height=0.1, threshold=0.01)
         
         # Should work without errors
         sim.run(5)
@@ -295,13 +292,13 @@ class TestParameterValidation:
         
         # Very high threshold (should result in mostly empty layers)
         generator_high_threshold = Model3DGenerator(
-            sim, layer_height=1.0, threshold=10.0, base_radius=1
+            sim, layer_height=1.0, threshold=10.0
         )
         generator_high_threshold.capture_layer()
         
-        # Base should still be present due to base connectivity enforcement
+        # With very high threshold, layer might be mostly empty
         first_layer = generator_high_threshold.layers[0]
-        assert np.any(first_layer)  # Should have some True values from base
+        # Layer should be based purely on simulation data above threshold
 
 
 if __name__ == "__main__":

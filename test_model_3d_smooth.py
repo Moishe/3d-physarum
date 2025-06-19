@@ -26,10 +26,8 @@ class TestSmoothModel3DGenerator:
         assert self.generator.simulation == self.simulation
         assert self.generator.layer_height == 1.0
         assert self.generator.threshold == 0.1
-        assert self.generator.base_radius == 10
         assert self.generator.smoothing_iterations == 0
         assert len(self.generator.layers) == 0
-        assert self.generator.base_center == (self.width // 2, self.height // 2)
     
     def test_initialization_with_custom_parameters(self):
         """Test initialization with custom parameters."""
@@ -37,12 +35,10 @@ class TestSmoothModel3DGenerator:
             self.simulation,
             layer_height=2.0,
             threshold=0.2,
-            base_radius=15,
             smoothing_iterations=3
         )
         assert custom_generator.layer_height == 2.0
         assert custom_generator.threshold == 0.2
-        assert custom_generator.base_radius == 15
         assert custom_generator.smoothing_iterations == 3
     
     def test_initialization_with_phase2_parameters(self):
@@ -96,8 +92,8 @@ class TestSmoothModel3DGenerator:
         assert layer.dtype == bool
         assert layer.shape == (self.height, self.width)
     
-    def test_base_connectivity_first_layer(self):
-        """Test that the first layer has proper base connectivity."""
+    def test_first_layer_from_simulation(self):
+        """Test that the first layer is based purely on simulation data."""
         # Run simulation and capture first layer
         for _ in range(10):
             self.simulation.step()
@@ -105,14 +101,11 @@ class TestSmoothModel3DGenerator:
         self.generator.capture_layer()
         first_layer = self.generator.layers[0]
         
-        # Check that base area is solid
-        center_x, center_y = self.generator.base_center
-        y_coords, x_coords = np.ogrid[:self.height, :self.width]
-        distance_from_center = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
-        base_mask = distance_from_center <= self.generator.base_radius
+        # Verify layer is based on simulation threshold, not artificial base
+        trail_map = self.simulation.get_trail_map()
+        expected_layer = trail_map > self.generator.threshold
         
-        # All base pixels should be True
-        assert np.all(first_layer[base_mask])
+        assert np.array_equal(first_layer, expected_layer), "First layer should match simulation data above threshold"
     
     def test_upward_connectivity(self):
         """Test that subsequent layers maintain connectivity."""
@@ -410,7 +403,6 @@ class TestSmoothModelIntegration:
             steps=30,
             layer_height=1.5,
             threshold=0.05,
-            base_radius=8,
             smoothing_iterations=1
         )
         
@@ -418,7 +410,6 @@ class TestSmoothModelIntegration:
         assert isinstance(generator, SmoothModel3DGenerator)
         assert generator.layer_height == 1.5
         assert generator.threshold == 0.05
-        assert generator.base_radius == 8
         assert generator.smoothing_iterations == 1
         assert generator.get_layer_count() > 0
         

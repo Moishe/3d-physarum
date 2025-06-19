@@ -12,21 +12,18 @@ class Model3DGenerator:
     """Generates 3D models from Physarum simulation data."""
     
     def __init__(self, simulation: PhysarumSimulation, layer_height: float = 1.0,
-                 threshold: float = 0.1, base_radius: int = 10):
+                 threshold: float = 0.1):
         """Initialize the 3D model generator.
         
         Args:
             simulation: The Physarum simulation to generate models from
             layer_height: Height of each simulation step in the Z-axis
             threshold: Minimum trail strength to include in 3D model
-            base_radius: Radius of the central base constraint
         """
         self.simulation = simulation
         self.layer_height = layer_height
         self.threshold = threshold
-        self.base_radius = base_radius
         self.layers = []  # Store simulation frames as layers
-        self.base_center = (simulation.grid.width // 2, simulation.grid.height // 2)
         
     def capture_layer(self) -> None:
         """Capture current simulation state as a 3D layer."""
@@ -36,36 +33,12 @@ class Model3DGenerator:
         # Apply threshold to create binary mask
         layer_mask = trail_map > self.threshold
         
-        # Ensure base connectivity if this is the first layer
-        if len(self.layers) == 0:
-            layer_mask = self._ensure_base_connectivity(layer_mask)
-        else:
-            # For subsequent layers, ensure connectivity to previous layer
+        # For subsequent layers, ensure connectivity to previous layer
+        if len(self.layers) > 0:
             layer_mask = self._ensure_upward_connectivity(layer_mask)
         
         self.layers.append(layer_mask)
     
-    def _ensure_base_connectivity(self, layer_mask: np.ndarray) -> np.ndarray:
-        """Ensure the first layer has a solid base at the center.
-        
-        Args:
-            layer_mask: Binary mask of the current layer
-            
-        Returns:
-            Modified layer mask with base connectivity
-        """
-        modified_mask = layer_mask.copy()
-        center_x, center_y = self.base_center
-        
-        # Create circular base area
-        y_coords, x_coords = np.ogrid[:layer_mask.shape[0], :layer_mask.shape[1]]
-        distance_from_center = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
-        base_mask = distance_from_center <= self.base_radius
-        
-        # Ensure base area is solid
-        modified_mask[base_mask] = True
-        
-        return modified_mask
     
     def _ensure_upward_connectivity(self, layer_mask: np.ndarray) -> np.ndarray:
         """Ensure current layer connects to the previous layer (upward growth only).
@@ -318,8 +291,7 @@ class Model3DGenerator:
 def generate_3d_model_from_simulation(width: int, height: int, num_actors: int, 
                                     decay_rate: float, steps: int, 
                                     layer_height: float = 1.0, 
-                                    threshold: float = 0.1,
-                                    base_radius: int = 10) -> Model3DGenerator:
+                                    threshold: float = 0.1) -> Model3DGenerator:
     """Generate a 3D model from a Physarum simulation.
     
     Args:
@@ -330,7 +302,6 @@ def generate_3d_model_from_simulation(width: int, height: int, num_actors: int,
         steps: Number of simulation steps
         layer_height: Height of each layer in 3D model
         threshold: Minimum trail strength for inclusion
-        base_radius: Radius of the base constraint
         
     Returns:
         Model3DGenerator with captured layers
@@ -339,7 +310,7 @@ def generate_3d_model_from_simulation(width: int, height: int, num_actors: int,
     sim = PhysarumSimulation(width, height, num_actors, decay_rate)
     
     # Create 3D model generator
-    generator = Model3DGenerator(sim, layer_height, threshold, base_radius)
+    generator = Model3DGenerator(sim, layer_height, threshold)
     
     # Run simulation and capture layers
     for step in range(steps):
