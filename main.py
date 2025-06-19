@@ -21,6 +21,8 @@ Examples:
   %(prog)s --width 150 --height 150 --decay 0.02 --threshold 0.15
   %(prog)s --view-radius 5 --view-distance 15 --speed 1.5
   %(prog)s --smooth --smoothing-iterations 3 --output smooth_model.stl
+  %(prog)s --smooth --smoothing-type taubin --taubin-lambda 0.6 --mesh-quality
+  %(prog)s --smooth --smoothing-type feature_preserving --preserve-features --feature-angle 45
         """
     )
     
@@ -57,6 +59,19 @@ Examples:
                             help='Capture layer every N steps (default: 5)')
     model_group.add_argument('--smoothing-iterations', type=int, default=2, metavar='N',
                             help='Number of smoothing iterations for smooth surfaces (default: 2)')
+    model_group.add_argument('--smoothing-type', type=str, default='taubin', 
+                            choices=['laplacian', 'taubin', 'feature_preserving'],
+                            help='Type of smoothing algorithm (default: taubin)')
+    model_group.add_argument('--taubin-lambda', type=float, default=0.5, metavar='F',
+                            help='Taubin smoothing lambda parameter (default: 0.5)')
+    model_group.add_argument('--taubin-mu', type=float, default=-0.52, metavar='F',
+                            help='Taubin smoothing mu parameter (default: -0.52)')
+    model_group.add_argument('--preserve-features', action='store_true',
+                            help='Preserve sharp features during smoothing')
+    model_group.add_argument('--feature-angle', type=float, default=60.0, metavar='F',
+                            help='Feature edge angle threshold in degrees (default: 60.0)')
+    model_group.add_argument('--mesh-quality', action='store_true',
+                            help='Show detailed mesh quality metrics')
     
     # Output parameters
     output_group = parser.add_argument_group('Output Parameters')
@@ -107,6 +122,12 @@ def validate_parameters(args):
         errors.append("Layer frequency must be positive")
     if args.smoothing_iterations < 0:
         errors.append("Smoothing iterations must be non-negative")
+    if args.taubin_lambda <= 0 or args.taubin_lambda >= 1:
+        errors.append("Taubin lambda must be between 0 and 1 (exclusive)")
+    if args.taubin_mu >= 0 or args.taubin_mu <= -1:
+        errors.append("Taubin mu must be between -1 and 0 (exclusive)")
+    if args.feature_angle <= 0 or args.feature_angle >= 180:
+        errors.append("Feature angle must be between 0 and 180 degrees")
     
     # Output validation
     if not args.output.endswith('.stl'):
@@ -138,6 +159,13 @@ def run_simulation_with_3d_generation(args):
         print(f"Base radius: {args.base_radius}")
         if args.smooth:
             print(f"Smoothing iterations: {args.smoothing_iterations}")
+            print(f"Smoothing type: {args.smoothing_type}")
+            if args.smoothing_type == 'taubin':
+                print(f"Taubin lambda: {args.taubin_lambda}")
+                print(f"Taubin mu: {args.taubin_mu}")
+            if args.smoothing_type == 'feature_preserving' or args.preserve_features:
+                print(f"Preserve features: {args.preserve_features}")
+                print(f"Feature angle: {args.feature_angle}°")
         print(f"Output file: {args.output}")
         print()
     
@@ -159,7 +187,12 @@ def run_simulation_with_3d_generation(args):
             layer_height=args.layer_height,
             threshold=args.threshold,
             base_radius=args.base_radius,
-            smoothing_iterations=args.smoothing_iterations
+            smoothing_iterations=args.smoothing_iterations,
+            smoothing_type=args.smoothing_type,
+            taubin_lambda=args.taubin_lambda,
+            taubin_mu=args.taubin_mu,
+            preserve_features=args.preserve_features,
+            feature_angle=args.feature_angle
         )
     else:
         generator = Model3DGenerator(
@@ -218,6 +251,26 @@ def run_simulation_with_3d_generation(args):
             else:
                 size_str = f"{file_size} bytes"
             print(f"  File size: {size_str}")
+            
+            # Show mesh quality metrics if requested and using smooth generator
+            if args.mesh_quality and args.smooth and hasattr(generator, 'get_mesh_quality_metrics'):
+                print("\nMesh Quality Metrics:")
+                print("-" * 20)
+                metrics = generator.get_mesh_quality_metrics()
+                if "error" in metrics:
+                    print(f"Error: {metrics['error']}")
+                else:
+                    print(f"Vertices: {metrics['vertex_count']:,}")
+                    print(f"Faces: {metrics['face_count']:,}")
+                    print(f"Volume: {metrics['volume']:.2f}")
+                    print(f"Surface Area: {metrics['surface_area']:.2f}")
+                    print(f"Watertight: {'✓' if metrics['is_watertight'] else '✗'}")
+                    print(f"Winding Consistent: {'✓' if metrics['is_winding_consistent'] else '✗'}")
+                    print(f"3D Print Ready: {'✓' if metrics['print_ready'] else '✗'}")
+                    if metrics['issues']:
+                        print("Issues:")
+                        for issue in metrics['issues']:
+                            print(f"  - {issue}")
             
     except Exception as e:
         print(f"Error saving STL file: {e}", file=sys.stderr)

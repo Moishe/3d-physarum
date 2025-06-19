@@ -45,6 +45,40 @@ class TestSmoothModel3DGenerator:
         assert custom_generator.base_radius == 15
         assert custom_generator.smoothing_iterations == 3
     
+    def test_initialization_with_phase2_parameters(self):
+        """Test initialization with new Phase 2 parameters."""
+        phase2_generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_type="taubin",
+            taubin_lambda=0.6,
+            taubin_mu=-0.6,
+            preserve_features=True,
+            feature_angle=45.0
+        )
+        assert phase2_generator.smoothing_type == "taubin"
+        assert phase2_generator.taubin_lambda == 0.6
+        assert phase2_generator.taubin_mu == -0.6
+        assert phase2_generator.preserve_features == True
+        assert phase2_generator.feature_angle == pytest.approx(np.radians(45.0))
+    
+    def test_invalid_smoothing_type(self):
+        """Test that invalid smoothing type raises an error."""
+        generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_iterations=1,
+            smoothing_type="invalid_type"
+        )
+        
+        # Run simulation and capture layers
+        for i in range(10):
+            self.simulation.step()
+            if i % 3 == 0:
+                generator.capture_layer()
+        
+        # Should raise ValueError for invalid smoothing type
+        with pytest.raises(ValueError, match="Unknown smoothing type"):
+            generator.generate_mesh()
+    
     def test_capture_layer(self):
         """Test layer capture functionality."""
         # Run a few simulation steps
@@ -233,6 +267,134 @@ class TestSmoothModel3DGenerator:
         except ValueError:
             # This is acceptable for very high thresholds
             pass
+    
+    def test_taubin_smoothing(self):
+        """Test Taubin smoothing algorithm."""
+        taubin_generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_iterations=3,
+            smoothing_type="taubin",
+            taubin_lambda=0.5,
+            taubin_mu=-0.52
+        )
+        
+        # Run simulation and capture layers
+        for i in range(20):
+            self.simulation.step()
+            if i % 4 == 0:
+                taubin_generator.capture_layer()
+        
+        # Generate mesh with Taubin smoothing
+        mesh = taubin_generator.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+    
+    def test_feature_preserving_smoothing(self):
+        """Test feature-preserving smoothing algorithm."""
+        feature_generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_iterations=3,
+            smoothing_type="feature_preserving",
+            preserve_features=True,
+            feature_angle=60.0
+        )
+        
+        # Run simulation and capture layers
+        for i in range(20):
+            self.simulation.step()
+            if i % 4 == 0:
+                feature_generator.capture_layer()
+        
+        # Generate mesh with feature preservation
+        mesh = feature_generator.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+    
+    def test_mesh_quality_metrics(self):
+        """Test mesh quality metrics functionality."""
+        # Run simulation and capture layers
+        for i in range(20):
+            self.simulation.step()
+            if i % 4 == 0:
+                self.generator.capture_layer()
+        
+        # Get quality metrics
+        metrics = self.generator.get_mesh_quality_metrics()
+        
+        # Should not have error
+        assert "error" not in metrics
+        
+        # Check expected metrics are present
+        expected_keys = [
+            "vertex_count", "face_count", "volume", "surface_area",
+            "is_watertight", "is_winding_consistent", "euler_number",
+            "bounds", "center_mass", "issues", "print_ready"
+        ]
+        for key in expected_keys:
+            assert key in metrics
+        
+        # Basic sanity checks
+        assert metrics["vertex_count"] > 0
+        assert metrics["face_count"] > 0
+        assert metrics["volume"] > 0
+        assert metrics["surface_area"] > 0
+        assert isinstance(metrics["is_watertight"], bool)
+        assert isinstance(metrics["is_winding_consistent"], bool)
+        assert isinstance(metrics["issues"], list)
+        assert isinstance(metrics["print_ready"], bool)
+    
+    def test_mesh_quality_metrics_no_layers(self):
+        """Test mesh quality metrics with no layers captured."""
+        metrics = self.generator.get_mesh_quality_metrics()
+        assert "error" in metrics
+        assert "No layers captured" in metrics["error"]
+    
+    def test_enhanced_mesh_validation(self):
+        """Test enhanced mesh validation and repair functionality."""
+        generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_iterations=2
+        )
+        
+        # Run simulation and capture layers
+        for i in range(20):
+            self.simulation.step()
+            if i % 4 == 0:
+                generator.capture_layer()
+        
+        # Generate mesh - validation happens internally
+        mesh = generator.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+        
+        # Verify mesh has valid face structure
+        for vector in mesh.vectors:
+            assert vector.shape == (3, 3)
+            # Check that vertices are not all the same (degenerate face)
+            v1, v2, v3 = vector
+            assert not (np.allclose(v1, v2) and np.allclose(v2, v3))
+    
+    def test_different_taubin_parameters(self):
+        """Test Taubin smoothing with different parameter values."""
+        # Test with custom Taubin parameters
+        custom_taubin = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_iterations=2,
+            smoothing_type="taubin",
+            taubin_lambda=0.6,
+            taubin_mu=-0.61
+        )
+        
+        # Run simulation and capture layers
+        for i in range(15):
+            self.simulation.step()
+            if i % 3 == 0:
+                custom_taubin.capture_layer()
+        
+        # Should generate valid mesh
+        mesh = custom_taubin.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
 
 
 class TestSmoothModelIntegration:
@@ -262,6 +424,56 @@ class TestSmoothModelIntegration:
         
         # Verify connectivity
         assert generator.validate_connectivity()
+        
+        # Generate mesh
+        mesh = generator.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+    
+    def test_generate_smooth_3d_model_with_taubin_smoothing(self):
+        """Test the convenience function with Taubin smoothing."""
+        generator = generate_smooth_3d_model_from_simulation(
+            width=30,
+            height=30,
+            num_actors=15,
+            decay_rate=0.02,
+            steps=25,
+            smoothing_iterations=2,
+            smoothing_type="taubin",
+            taubin_lambda=0.5,
+            taubin_mu=-0.52
+        )
+        
+        # Verify generator properties
+        assert generator.smoothing_type == "taubin"
+        assert generator.taubin_lambda == 0.5
+        assert generator.taubin_mu == -0.52
+        assert generator.get_layer_count() > 0
+        
+        # Generate mesh
+        mesh = generator.generate_mesh()
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+    
+    def test_generate_smooth_3d_model_with_feature_preservation(self):
+        """Test the convenience function with feature preservation."""
+        generator = generate_smooth_3d_model_from_simulation(
+            width=25,
+            height=25,
+            num_actors=10,
+            decay_rate=0.015,
+            steps=20,
+            smoothing_iterations=2,
+            smoothing_type="feature_preserving",
+            preserve_features=True,
+            feature_angle=45.0
+        )
+        
+        # Verify generator properties
+        assert generator.smoothing_type == "feature_preserving"
+        assert generator.preserve_features == True
+        assert generator.feature_angle == pytest.approx(np.radians(45.0))
+        assert generator.get_layer_count() > 0
         
         # Generate mesh
         mesh = generator.generate_mesh()
@@ -314,6 +526,126 @@ class TestSmoothModelIntegration:
         mesh = generator.generate_mesh()
         assert mesh is not None
         assert len(mesh.vectors) > 0
+
+
+class TestSmoothingAlgorithmComparison:
+    """Test suite for comparing different smoothing algorithms."""
+    
+    def setup_method(self):
+        """Set up test fixtures for algorithm comparison."""
+        self.base_params = {
+            'width': 40,
+            'height': 40,
+            'num_actors': 20,
+            'decay_rate': 0.02,
+            'steps': 30,
+            'smoothing_iterations': 2
+        }
+    
+    def test_all_smoothing_algorithms_work(self):
+        """Test that all smoothing algorithms produce valid meshes."""
+        algorithms = ['laplacian', 'taubin', 'feature_preserving']
+        
+        for algorithm in algorithms:
+            generator = generate_smooth_3d_model_from_simulation(
+                **self.base_params,
+                smoothing_type=algorithm
+            )
+            
+            # All algorithms should produce valid meshes
+            mesh = generator.generate_mesh()
+            assert mesh is not None, f"{algorithm} smoothing failed"
+            assert len(mesh.vectors) > 0, f"{algorithm} produced empty mesh"
+            
+            # Check mesh quality
+            metrics = generator.get_mesh_quality_metrics()
+            assert "error" not in metrics, f"{algorithm} quality check failed"
+            assert metrics["vertex_count"] > 0, f"{algorithm} has no vertices"
+            assert metrics["face_count"] > 0, f"{algorithm} has no faces"
+    
+    def test_mesh_quality_differences(self):
+        """Test that different algorithms produce different quality characteristics."""
+        # Generate with Laplacian smoothing
+        laplacian_gen = generate_smooth_3d_model_from_simulation(
+            **self.base_params,
+            smoothing_type="laplacian"
+        )
+        laplacian_metrics = laplacian_gen.get_mesh_quality_metrics()
+        
+        # Generate with Taubin smoothing
+        taubin_gen = generate_smooth_3d_model_from_simulation(
+            **self.base_params,
+            smoothing_type="taubin"
+        )
+        taubin_metrics = taubin_gen.get_mesh_quality_metrics()
+        
+        # Both should be valid
+        assert "error" not in laplacian_metrics
+        assert "error" not in taubin_metrics
+        
+        # Both should have reasonable properties
+        assert laplacian_metrics["volume"] > 0
+        assert taubin_metrics["volume"] > 0
+        assert laplacian_metrics["surface_area"] > 0
+        assert taubin_metrics["surface_area"] > 0
+    
+    def test_feature_preservation_options(self):
+        """Test feature preservation with different settings."""
+        # Test with feature preservation enabled
+        with_features = generate_smooth_3d_model_from_simulation(
+            **self.base_params,
+            smoothing_type="feature_preserving",
+            preserve_features=True,
+            feature_angle=30.0
+        )
+        
+        # Test with feature preservation disabled
+        without_features = generate_smooth_3d_model_from_simulation(
+            **self.base_params,
+            smoothing_type="feature_preserving",
+            preserve_features=False,
+            feature_angle=30.0
+        )
+        
+        # Both should work
+        mesh_with = with_features.generate_mesh()
+        mesh_without = without_features.generate_mesh()
+        
+        assert mesh_with is not None
+        assert mesh_without is not None
+        assert len(mesh_with.vectors) > 0
+        assert len(mesh_without.vectors) > 0
+    
+    def test_extreme_taubin_parameters(self):
+        """Test Taubin smoothing with edge-case parameters."""
+        # Create modified params for minimal smoothing
+        minimal_params = self.base_params.copy()
+        minimal_params['smoothing_iterations'] = 1
+        minimal_gen = generate_smooth_3d_model_from_simulation(
+            **minimal_params,
+            smoothing_type="taubin",
+            taubin_lambda=0.1,
+            taubin_mu=-0.11
+        )
+        
+        # Create modified params for aggressive smoothing
+        aggressive_params = self.base_params.copy()
+        aggressive_params['smoothing_iterations'] = 5
+        aggressive_gen = generate_smooth_3d_model_from_simulation(
+            **aggressive_params,
+            smoothing_type="taubin",
+            taubin_lambda=0.8,
+            taubin_mu=-0.81
+        )
+        
+        # Both should produce valid meshes
+        minimal_mesh = minimal_gen.generate_mesh()
+        aggressive_mesh = aggressive_gen.generate_mesh()
+        
+        assert minimal_mesh is not None
+        assert aggressive_mesh is not None
+        assert len(minimal_mesh.vectors) > 0
+        assert len(aggressive_mesh.vectors) > 0
 
 
 if __name__ == "__main__":
