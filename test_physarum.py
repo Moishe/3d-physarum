@@ -56,6 +56,75 @@ class TestPhysarumGrid:
         
         # Grid should remain unchanged for out-of-bounds deposits
         assert np.all(grid.trail_map == 0)
+    
+    def test_grid_diffusion_no_effect_when_zero(self):
+        """Test that diffusion has no effect when diffusion rate is 0."""
+        grid = PhysarumGrid(10, 10)
+        grid.deposit_trail(5, 5, 1.0)
+        
+        initial_state = grid.trail_map.copy()
+        grid.apply_diffusion(0.0)
+        
+        assert np.array_equal(grid.trail_map, initial_state)
+    
+    def test_grid_diffusion_spreads_pheromone(self):
+        """Test that diffusion spreads pheromone to neighboring cells."""
+        grid = PhysarumGrid(10, 10)
+        center_x, center_y = 5, 5
+        initial_amount = 1.0
+        diffusion_rate = 0.5
+        
+        # Deposit pheromone at center
+        grid.deposit_trail(center_x, center_y, initial_amount)
+        
+        # Apply diffusion
+        grid.apply_diffusion(diffusion_rate)
+        
+        # Center should have less pheromone
+        assert grid.trail_map[center_y, center_x] < initial_amount
+        
+        # Neighbors should have gained pheromone
+        neighbors_have_pheromone = False
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
+                    continue  # Skip center
+                x, y = center_x + dx, center_y + dy
+                if 0 <= x < grid.width and 0 <= y < grid.height:
+                    if grid.trail_map[y, x] > 0:
+                        neighbors_have_pheromone = True
+                        break
+        
+        assert neighbors_have_pheromone
+    
+    def test_grid_diffusion_conserves_total_pheromone(self):
+        """Test that diffusion conserves total pheromone in the system."""
+        grid = PhysarumGrid(10, 10)
+        grid.deposit_trail(5, 5, 1.0)
+        grid.deposit_trail(3, 3, 0.5)
+        
+        total_before = np.sum(grid.trail_map)
+        grid.apply_diffusion(0.3)
+        total_after = np.sum(grid.trail_map)
+        
+        # Total should be conserved (within floating point precision)
+        assert np.isclose(total_before, total_after, atol=1e-6)
+    
+    def test_grid_diffusion_with_boundaries(self):
+        """Test diffusion behavior at grid boundaries."""
+        grid = PhysarumGrid(5, 5)
+        # Place pheromone at corner
+        grid.deposit_trail(0, 0, 1.0)
+        
+        initial_total = np.sum(grid.trail_map)
+        grid.apply_diffusion(0.5)
+        final_total = np.sum(grid.trail_map)
+        
+        # Pheromone should still be conserved even at boundaries
+        assert np.isclose(initial_total, final_total, atol=1e-6)
+        
+        # Corner should have less pheromone after diffusion
+        assert grid.trail_map[0, 0] < 1.0
 
 
 class TestPhysarumActor:
@@ -180,6 +249,32 @@ class TestPhysarumSimulation:
         
         with pytest.raises(ValueError):
             PhysarumSimulation(100, 100, 10, 1.1)
+        
+        # Test invalid diffusion rate
+        with pytest.raises(ValueError):
+            PhysarumSimulation(100, 100, 10, 0.01, diffusion_rate=-0.1)
+        
+        with pytest.raises(ValueError):
+            PhysarumSimulation(100, 100, 10, 0.01, diffusion_rate=1.1)
+    
+    def test_simulation_with_diffusion(self):
+        """Test that simulation works correctly with diffusion enabled."""
+        simulation = PhysarumSimulation(50, 50, 5, decay_rate=0.01, diffusion_rate=0.1)
+        
+        # Should not raise any exceptions
+        simulation.step()
+        
+        # Trail map should have some non-zero values after a step
+        assert np.any(simulation.grid.trail_map > 0)
+        
+        # Diffusion rate should be stored correctly
+        assert simulation.diffusion_rate == 0.1
+    
+    def test_simulation_diffusion_default_zero(self):
+        """Test that diffusion rate defaults to 0.0 when not specified."""
+        simulation = PhysarumSimulation(50, 50, 5, 0.01)
+        
+        assert simulation.diffusion_rate == 0.0
 
 
 if __name__ == "__main__":

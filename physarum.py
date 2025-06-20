@@ -41,6 +41,47 @@ class PhysarumGrid:
         """
         self.trail_map *= (1.0 - decay_rate)
     
+    def apply_diffusion(self, diffusion_rate: float) -> None:
+        """Apply pheromone diffusion to spread trails to neighboring cells.
+        
+        Diffusion decreases trail intensity but increases their radius.
+        Total pheromone is conserved during the diffusion process.
+        
+        Args:
+            diffusion_rate: Rate of diffusion (0.0 to 1.0)
+        """
+        if diffusion_rate <= 0.0:
+            return
+            
+        # Create a copy of the current state
+        original_map = self.trail_map.copy()
+        
+        # For each cell, diffuse its pheromone to neighbors
+        for y in range(self.height):
+            for x in range(self.width):
+                if original_map[y, x] > 0:
+                    # Amount to diffuse from this cell
+                    to_diffuse = original_map[y, x] * diffusion_rate
+                    
+                    # Count valid neighbors
+                    valid_neighbors = []
+                    for dy in [-1, 0, 1]:
+                        for dx in [-1, 0, 1]:
+                            if dx == 0 and dy == 0:
+                                continue  # Skip center
+                            nx, ny = x + dx, y + dy
+                            if 0 <= nx < self.width and 0 <= ny < self.height:
+                                valid_neighbors.append((nx, ny))
+                    
+                    if valid_neighbors:
+                        # Distribute diffused amount equally among valid neighbors
+                        per_neighbor = to_diffuse / len(valid_neighbors)
+                        for nx, ny in valid_neighbors:
+                            self.trail_map[ny, nx] += per_neighbor
+                    
+                    # Remove diffused amount from original cell
+                    self.trail_map[y, x] -= to_diffuse
+    
     def get_trail_strength(self, x: int, y: int) -> float:
         """Get trail strength at the given coordinates.
         
@@ -207,7 +248,7 @@ class PhysarumSimulation:
     def __init__(self, width: int, height: int, num_actors: int, decay_rate: float, 
                  view_radius: int = 3, view_distance: int = 10, speed: float = 1.0,
                  initial_diameter: float = 20.0, death_probability: float = 0.001,
-                 spawn_probability: float = 0.005):
+                 spawn_probability: float = 0.005, diffusion_rate: float = 0.0):
         """Initialize the Physarum simulation.
         
         Args:
@@ -221,6 +262,7 @@ class PhysarumSimulation:
             initial_diameter: Diameter of initial circular actor placement
             death_probability: Base probability of actor death per step
             spawn_probability: Probability of spawning new actors per step
+            diffusion_rate: Rate of pheromone diffusion (0.0 to 1.0)
         """
         # Validate parameters
         if width <= 0 or height <= 0:
@@ -229,9 +271,12 @@ class PhysarumSimulation:
             raise ValueError("Number of actors must be positive")
         if decay_rate < 0 or decay_rate > 1:
             raise ValueError("Decay rate must be between 0 and 1")
+        if diffusion_rate < 0 or diffusion_rate > 1:
+            raise ValueError("Diffusion rate must be between 0 and 1")
         
         self.grid = PhysarumGrid(width, height)
         self.decay_rate = decay_rate
+        self.diffusion_rate = diffusion_rate
         self.speed = speed
         self.death_probability = death_probability
         self.spawn_probability = spawn_probability
@@ -307,6 +352,9 @@ class PhysarumSimulation:
         # Apply lifecycle changes
         self._handle_deaths()
         self._handle_spawning()
+        
+        # Apply diffusion to spread trails (before decay)
+        self.grid.apply_diffusion(self.diffusion_rate)
         
         # Apply decay to all trails
         self.grid.apply_decay(self.decay_rate)

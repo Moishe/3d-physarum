@@ -20,6 +20,7 @@ Examples:
   %(prog)s --steps 200 --actors 100 --output my_model.stl
   %(prog)s --width 150 --height 150 --decay 0.02 --threshold 0.15
   %(prog)s --view-radius 5 --view-distance 15 --speed 1.5
+  %(prog)s --diffusion-rate 0.1 --decay 0.005 --steps 300
   %(prog)s --smooth --smoothing-iterations 3 --output smooth_model.stl
   %(prog)s --smooth --smoothing-type taubin --taubin-lambda 0.6 --mesh-quality
   %(prog)s --smooth --smoothing-type feature_preserving --preserve-features --feature-angle 45
@@ -50,6 +51,8 @@ Examples:
                           help='Age-based death probability per step (default: 0.001)')
     sim_group.add_argument('--spawn-probability', type=float, default=0.005, metavar='F',
                           help='Probability of spawning new actors from existing locations (default: 0.005)')
+    sim_group.add_argument('--diffusion-rate', type=float, default=0.0, metavar='F',
+                          help='Pheromone diffusion rate 0.0-1.0 (default: 0.0 - no diffusion)')
     
     # 3D model parameters
     model_group = parser.add_argument_group('3D Model Parameters')
@@ -138,6 +141,8 @@ def validate_parameters(args):
         errors.append("Death probability must be between 0.0 and 1.0")
     if args.spawn_probability < 0 or args.spawn_probability > 1:
         errors.append("Spawn probability must be between 0.0 and 1.0")
+    if args.diffusion_rate < 0 or args.diffusion_rate > 1:
+        errors.append("Diffusion rate must be between 0.0 and 1.0")
     
     # Output validation
     if not args.output.endswith('.stl'):
@@ -160,6 +165,7 @@ def run_simulation_with_3d_generation(args):
         print(f"Actors: {args.actors}")
         print(f"Steps: {args.steps}")
         print(f"Decay rate: {args.decay}")
+        print(f"Diffusion rate: {args.diffusion_rate}")
         print(f"View radius: {args.view_radius}")
         print(f"View distance: {args.view_distance}")
         print(f"Speed: {args.speed}")
@@ -189,7 +195,8 @@ def run_simulation_with_3d_generation(args):
         speed=args.speed,
         initial_diameter=args.initial_diameter,
         death_probability=args.death_probability,
-        spawn_probability=args.spawn_probability
+        spawn_probability=args.spawn_probability,
+        diffusion_rate=args.diffusion_rate
     )
     
     # Create 3D model generator (smooth or voxel-based)
