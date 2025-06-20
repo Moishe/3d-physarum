@@ -44,6 +44,12 @@ Examples:
                           help='Actor sensing distance (default: 10)')
     sim_group.add_argument('--speed', type=float, default=1.0, metavar='F',
                           help='Actor movement speed (default: 1.0)')
+    sim_group.add_argument('--initial-diameter', type=float, default=20.0, metavar='F',
+                          help='Initial circle diameter for actor placement (default: 20.0)')
+    sim_group.add_argument('--death-probability', type=float, default=0.001, metavar='F',
+                          help='Age-based death probability per step (default: 0.001)')
+    sim_group.add_argument('--spawn-probability', type=float, default=0.005, metavar='F',
+                          help='Probability of spawning new actors from existing locations (default: 0.005)')
     
     # 3D model parameters
     model_group = parser.add_argument_group('3D Model Parameters')
@@ -125,6 +131,14 @@ def validate_parameters(args):
     if args.feature_angle <= 0 or args.feature_angle >= 180:
         errors.append("Feature angle must be between 0 and 180 degrees")
     
+    # Lifecycle parameters
+    if args.initial_diameter <= 0:
+        errors.append("Initial diameter must be positive")
+    if args.death_probability < 0 or args.death_probability > 1:
+        errors.append("Death probability must be between 0.0 and 1.0")
+    if args.spawn_probability < 0 or args.spawn_probability > 1:
+        errors.append("Spawn probability must be between 0.0 and 1.0")
+    
     # Output validation
     if not args.output.endswith('.stl'):
         errors.append("Output filename must end with .stl")
@@ -172,7 +186,10 @@ def run_simulation_with_3d_generation(args):
         decay_rate=args.decay,
         view_radius=args.view_radius,
         view_distance=args.view_distance,
-        speed=args.speed
+        speed=args.speed,
+        initial_diameter=args.initial_diameter,
+        death_probability=args.death_probability,
+        spawn_probability=args.spawn_probability
     )
     
     # Create 3D model generator (smooth or voxel-based)
@@ -212,8 +229,9 @@ def run_simulation_with_3d_generation(args):
             max_trail = np.max(trail_map)
             mean_trail = np.mean(trail_map)
             layers_captured = generator.get_layer_count()
+            actor_count = simulation.get_actor_count()
             print(f"  Step {step:3d}: Max trail = {max_trail:.3f}, "
-                  f"Mean trail = {mean_trail:.3f}, Layers = {layers_captured}")
+                  f"Mean trail = {mean_trail:.3f}, Layers = {layers_captured}, Actors = {actor_count}")
     
     # Capture final layer
     generator.capture_layer()

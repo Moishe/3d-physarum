@@ -76,6 +76,7 @@ class PhysarumActor:
         self.view_distance = view_distance
         self.turn_speed = 0.1  # How fast the actor can turn
         self.trail_deposit_amount = 1.0  # Amount of trail deposited per step
+        self.age = 0  # Age in simulation steps
     
     def move(self, speed: float) -> None:
         """Move the actor forward based on its current angle.
@@ -180,13 +181,33 @@ class PhysarumActor:
             grid: The simulation grid
         """
         grid.deposit_trail(int(self.x), int(self.y), self.trail_deposit_amount)
+    
+    def age_step(self) -> None:
+        """Increment the actor's age by one step."""
+        self.age += 1
+    
+    def should_die(self, death_probability: float) -> bool:
+        """Determine if actor should die based on age and death probability.
+        
+        Args:
+            death_probability: Base death probability per step
+            
+        Returns:
+            True if the actor should die
+        """
+        # Age-based death probability: older actors have higher chance of death
+        age_factor = 1.0 + (self.age * 0.001)  # Gradual increase with age
+        effective_death_prob = death_probability * age_factor
+        return random.random() < effective_death_prob
 
 
 class PhysarumSimulation:
     """Main simulation engine that orchestrates grid and actors."""
     
     def __init__(self, width: int, height: int, num_actors: int, decay_rate: float, 
-                 view_radius: int = 3, view_distance: int = 10, speed: float = 1.0):
+                 view_radius: int = 3, view_distance: int = 10, speed: float = 1.0,
+                 initial_diameter: float = 20.0, death_probability: float = 0.001,
+                 spawn_probability: float = 0.005):
         """Initialize the Physarum simulation.
         
         Args:
@@ -197,6 +218,9 @@ class PhysarumSimulation:
             view_radius: Sensor radius for actors
             view_distance: Sensor distance for actors
             speed: Movement speed for actors
+            initial_diameter: Diameter of initial circular actor placement
+            death_probability: Base probability of actor death per step
+            spawn_probability: Probability of spawning new actors per step
         """
         # Validate parameters
         if width <= 0 or height <= 0:
@@ -209,20 +233,62 @@ class PhysarumSimulation:
         self.grid = PhysarumGrid(width, height)
         self.decay_rate = decay_rate
         self.speed = speed
+        self.death_probability = death_probability
+        self.spawn_probability = spawn_probability
+        self.view_radius = view_radius
+        self.view_distance = view_distance
         self.actors = []
         
-        # Create actors with random positions and orientations
-        for _ in range(num_actors):
-            x = random.uniform(width * 0.2, width * 0.8)  # Start in central area
-            y = random.uniform(height * 0.2, height * 0.8)
-            angle = random.uniform(0, 2 * math.pi)
-            actor = PhysarumActor(x, y, angle, view_radius, view_distance)
+        # Create actors in a circular pattern
+        self._create_initial_actors(num_actors, initial_diameter, width, height)
+    
+    def _create_initial_actors(self, num_actors: int, diameter: float, width: int, height: int) -> None:
+        """Create initial actors arranged in a circle.
+        
+        Args:
+            num_actors: Number of actors to create
+            diameter: Diameter of the circle for placement
+            width: Grid width
+            height: Grid height
+        """
+        center_x = width / 2.0
+        center_y = height / 2.0
+        radius = diameter / 2.0
+        
+        # Calculate how many actors can fit around the circle
+        actors_to_place = min(num_actors, max(1, int(math.pi * diameter)))
+        
+        for i in range(actors_to_place):
+            # Place actors around the circle
+            angle = (2 * math.pi * i) / actors_to_place
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+            
+            # Random orientation
+            actor_angle = random.uniform(0, 2 * math.pi)
+            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance)
+            self.actors.append(actor)
+        
+        # If we need more actors than fit on the circle, place them randomly within the circle
+        for _ in range(num_actors - actors_to_place):
+            # Random position within the circle
+            r = radius * math.sqrt(random.random())
+            theta = random.uniform(0, 2 * math.pi)
+            x = center_x + r * math.cos(theta)
+            y = center_y + r * math.sin(theta)
+            
+            # Random orientation
+            actor_angle = random.uniform(0, 2 * math.pi)
+            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance)
             self.actors.append(actor)
     
     def step(self) -> None:
         """Perform one simulation step."""
         # Actor sensing and movement phase
         for actor in self.actors:
+            # Age the actor
+            actor.age_step()
+            
             # Sense environment
             left, center, right = actor.sense_environment(self.grid)
             
@@ -238,8 +304,43 @@ class PhysarumSimulation:
             # Deposit trail
             actor.deposit_trail(self.grid)
         
+        # Apply lifecycle changes
+        self._handle_deaths()
+        self._handle_spawning()
+        
         # Apply decay to all trails
         self.grid.apply_decay(self.decay_rate)
+    
+    def _handle_deaths(self) -> None:
+        """Remove actors that should die based on age and death probability."""
+        self.actors = [actor for actor in self.actors if not actor.should_die(self.death_probability)]
+    
+    def _handle_spawning(self) -> None:
+        """Spawn new actors from existing actor locations based on spawn probability."""
+        if not self.actors:  # No actors to spawn from
+            return
+            
+        new_actors = []
+        for actor in self.actors:
+            if random.random() < self.spawn_probability:
+                # Spawn new actor near this actor
+                spawn_distance = 5.0  # Distance from parent
+                spawn_angle = random.uniform(0, 2 * math.pi)
+                
+                new_x = actor.x + spawn_distance * math.cos(spawn_angle)
+                new_y = actor.y + spawn_distance * math.sin(spawn_angle)
+                
+                # Wrap around boundaries
+                new_x = new_x % self.grid.width
+                new_y = new_y % self.grid.height
+                
+                # Random orientation for new actor
+                new_angle = random.uniform(0, 2 * math.pi)
+                new_actor = PhysarumActor(new_x, new_y, new_angle, self.view_radius, self.view_distance)
+                new_actors.append(new_actor)
+        
+        # Add new actors to the simulation
+        self.actors.extend(new_actors)
     
     def run(self, steps: int) -> None:
         """Run the simulation for a specified number of steps.
@@ -257,3 +358,11 @@ class PhysarumSimulation:
             Copy of the current trail map
         """
         return self.grid.trail_map.copy()
+    
+    def get_actor_count(self) -> int:
+        """Get the current number of active actors.
+        
+        Returns:
+            Number of active actors
+        """
+        return len(self.actors)
