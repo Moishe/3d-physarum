@@ -188,62 +188,96 @@ class SmoothModel3DGenerator:
         return stl_mesh
     
     def _generate_boundary_outline_mesh(self, volume: np.ndarray) -> trimesh.Trimesh:
-        """Generate mesh using boundary outline detection to eliminate blocky appearance.
+        """Generate mesh using true contour-based boundary detection to eliminate blocky appearance.
         
-        This method detects the outer boundary faces of the voxelized volume and creates
-        triangular faces only along the perimeter, eliminating the interior pixelated
-        structure while maintaining the overall form.
+        This method finds the contours of connected regions and creates smooth surfaces
+        around them, rather than individual voxel faces, to eliminate pixelated appearance.
         
         Args:
             volume: 3D volume array with binary voxel data
             
         Returns:
-            Trimesh object with boundary outline mesh
+            Trimesh object with smooth contour-based mesh
         """
-        # Convert volume to binary
-        binary_volume = volume > 0.5
+        # Use marching cubes on a smoothed version to get genuinely smooth contours
+        # First, apply Gaussian smoothing to eliminate voxel boundaries while preserving shape
+        from scipy.ndimage import gaussian_filter
         
-        # Find all boundary voxels (voxels with at least one face exposed to air)
-        boundary_voxels = self._find_boundary_voxels(binary_volume)
+        # Smooth the volume to create genuine curves instead of voxel boundaries
+        smoothed_volume = gaussian_filter(volume.astype(float), sigma=1.2)
         
-        # Generate faces only for boundary voxels, and only for faces that are exposed
-        triangles = []
-        height, width, depth = binary_volume.shape
+        # Apply marching cubes with a lower threshold to capture the smoothed contours
+        try:
+            vertices, faces, normals, values = measure.marching_cubes(
+                smoothed_volume,
+                level=0.25,  # Lower threshold to capture more of the smoothed volume
+                spacing=(1.0, 1.0, self.layer_height)
+            )
+        except ValueError:
+            # Fallback: try with less smoothing if first attempt fails
+            try:
+                smoothed_volume = gaussian_filter(volume.astype(float), sigma=0.8)
+                vertices, faces, normals, values = measure.marching_cubes(
+                    smoothed_volume,
+                    level=0.3,
+                    spacing=(1.0, 1.0, self.layer_height)
+                )
+            except ValueError:
+                # Last fallback: use original volume
+                vertices, faces, normals, values = measure.marching_cubes(
+                    volume,
+                    level=0.5,
+                    spacing=(1.0, 1.0, self.layer_height)
+                )
         
-        for z in range(depth):
-            for y in range(height):
-                for x in range(width):
-                    if boundary_voxels[y, x, z]:
-                        # This is a boundary voxel - generate exposed faces only
-                        exposed_faces = self._get_exposed_faces(binary_volume, x, y, z)
-                        voxel_triangles = self._create_boundary_voxel_faces(
-                            x, y, z, exposed_faces, self.layer_height
-                        )
-                        triangles.extend(voxel_triangles)
+        # Create initial mesh
+        tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
         
-        if not triangles:
-            raise ValueError("No boundary faces found - volume may be empty")
-        
-        # Convert triangles to vertices and faces arrays
-        vertices = []
-        faces = []
-        vertex_map = {}  # Map vertex coordinates to indices for deduplication
-        
-        for triangle in triangles:
-            face_indices = []
-            for vertex in triangle:
-                # Convert to tuple for hashing
-                vertex_key = tuple(vertex)
-                if vertex_key not in vertex_map:
-                    vertex_map[vertex_key] = len(vertices)
-                    vertices.append(vertex)
-                face_indices.append(vertex_map[vertex_key])
-            faces.append(face_indices)
-        
-        # Create trimesh object
-        tri_mesh = trimesh.Trimesh(vertices=np.array(vertices), faces=np.array(faces))
+        # Apply additional smoothing to further reduce any remaining voxel artifacts
+        tri_mesh = self._apply_contour_smoothing(tri_mesh, iterations=4)
         
         return tri_mesh
+    
+    def _apply_contour_smoothing(self, tri_mesh: trimesh.Trimesh, iterations: int) -> trimesh.Trimesh:
+        """Apply specialized smoothing designed to eliminate voxel artifacts while preserving shape.
+        
+        Args:
+            tri_mesh: Input trimesh object
+            iterations: Number of smoothing iterations
+            
+        Returns:
+            Smoothed trimesh object with reduced voxel artifacts
+        """
+        smoothed_mesh = tri_mesh.copy()
+        
+        for _ in range(iterations):
+            # Build vertex adjacency using edges
+            edges = smoothed_mesh.edges_unique
+            n_vertices = len(smoothed_mesh.vertices)
+            
+            # Create adjacency list for each vertex
+            vertex_neighbors = [[] for _ in range(n_vertices)]
+            for edge in edges:
+                vertex_neighbors[edge[0]].append(edge[1])
+                vertex_neighbors[edge[1]].append(edge[0])
+            
+            # Apply smoothing with adaptive damping based on curvature
+            damping = 0.3  # Higher damping for more aggressive smoothing
+            new_vertices = smoothed_mesh.vertices.copy()
+            
+            for i, neighbors in enumerate(vertex_neighbors):
+                if len(neighbors) > 0:
+                    # Compute average position of neighbors
+                    neighbor_positions = smoothed_mesh.vertices[neighbors]
+                    average_neighbor = np.mean(neighbor_positions, axis=0)
+                    
+                    # Move vertex towards average of neighbors
+                    new_vertices[i] = smoothed_mesh.vertices[i] + damping * (average_neighbor - smoothed_mesh.vertices[i])
+            
+            # Update mesh vertices
+            smoothed_mesh.vertices = new_vertices
+        
+        return smoothed_mesh
     
     def _find_boundary_voxels(self, binary_volume: np.ndarray) -> np.ndarray:
         """Find all voxels that are on the boundary (have at least one face exposed to air).
