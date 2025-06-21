@@ -53,6 +53,8 @@ Examples:
                           help='Probability of spawning new actors from existing locations (default: 0.005)')
     sim_group.add_argument('--diffusion-rate', type=float, default=0.0, metavar='F',
                           help='Pheromone diffusion rate 0.0-1.0 (default: 0.0 - no diffusion)')
+    sim_group.add_argument('--direction-deviation', type=float, default=1.57, metavar='F',
+                          help='Maximum direction deviation for spawned actors in radians (default: 1.57 - π/2 radians)')
     sim_group.add_argument('--image', type=str, metavar='PATH',
                           help='JPEG image path for initial actor placement (overrides --actors)')
     
@@ -153,6 +155,8 @@ def validate_parameters(args):
         errors.append("Spawn probability must be between 0.0 and 1.0")
     if args.diffusion_rate < 0 or args.diffusion_rate > 1:
         errors.append("Diffusion rate must be between 0.0 and 1.0")
+    if args.direction_deviation < 0 or args.direction_deviation > 3.14159:
+        errors.append("Direction deviation must be between 0.0 and π (3.14159) radians")
     
     # Output validation
     if not args.output.endswith('.stl'):
@@ -210,6 +214,7 @@ def run_simulation_with_3d_generation(args):
         death_probability=args.death_probability,
         spawn_probability=args.spawn_probability,
         diffusion_rate=args.diffusion_rate,
+        direction_deviation=args.direction_deviation,
         image_path=args.image
     )
     

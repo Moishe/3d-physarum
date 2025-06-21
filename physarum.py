@@ -250,7 +250,7 @@ class PhysarumSimulation:
                  view_radius: int = 3, view_distance: int = 10, speed: float = 1.0,
                  initial_diameter: float = 20.0, death_probability: float = 0.001,
                  spawn_probability: float = 0.005, diffusion_rate: float = 0.0,
-                 image_path: Optional[str] = None):
+                 direction_deviation: float = 1.57, image_path: Optional[str] = None):
         """Initialize the Physarum simulation.
         
         Args:
@@ -265,6 +265,7 @@ class PhysarumSimulation:
             death_probability: Base probability of actor death per step
             spawn_probability: Probability of spawning new actors per step
             diffusion_rate: Rate of pheromone diffusion (0.0 to 1.0)
+            direction_deviation: Maximum direction deviation for spawned actors in radians
             image_path: Path to JPEG image for initial actor placement (overrides num_actors)
         """
         # Validate parameters
@@ -276,6 +277,8 @@ class PhysarumSimulation:
             raise ValueError("Decay rate must be between 0 and 1")
         if diffusion_rate < 0 or diffusion_rate > 1:
             raise ValueError("Diffusion rate must be between 0 and 1")
+        if direction_deviation < 0 or direction_deviation > 3.14159:
+            raise ValueError("Direction deviation must be between 0 and π radians")
         
         self.grid = PhysarumGrid(width, height)
         self.decay_rate = decay_rate
@@ -283,6 +286,7 @@ class PhysarumSimulation:
         self.speed = speed
         self.death_probability = death_probability
         self.spawn_probability = spawn_probability
+        self.direction_deviation = direction_deviation
         self.view_radius = view_radius
         self.view_distance = view_distance
         self.actors = []
@@ -441,8 +445,9 @@ class PhysarumSimulation:
                 new_x = new_x % self.grid.width
                 new_y = new_y % self.grid.height
                 
-                # Random orientation for new actor
-                new_angle = random.uniform(0, 2 * math.pi)
+                # Direction inheritance with triangular distribution (peak at 0, falloff to bounds)
+                deviation = random.triangular(-self.direction_deviation, self.direction_deviation, 0)
+                new_angle = actor.angle + deviation
                 new_actor = PhysarumActor(new_x, new_y, new_angle, self.view_radius, self.view_distance)
                 new_actors.append(new_actor)
         

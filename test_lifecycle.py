@@ -223,6 +223,179 @@ class TestLifecycleFunctionality(unittest.TestCase):
             self.assertLess(actor.x, 10)
             self.assertGreaterEqual(actor.y, 0)
             self.assertLess(actor.y, 10)
+    
+    def test_direction_inheritance_with_zero_deviation(self):
+        """Test that spawned actors inherit parent direction with zero deviation."""
+        # Set up simulation with zero deviation
+        sim = PhysarumSimulation(
+            width=100, height=100, num_actors=1, decay_rate=0.01,
+            spawn_probability=1.0, direction_deviation=0.0
+        )
+        
+        # Set parent actor to specific direction
+        parent_angle = math.pi / 4  # 45 degrees
+        sim.actors[0].angle = parent_angle
+        
+        # Force spawning
+        initial_count = len(sim.actors)
+        sim._handle_spawning()
+        
+        # Check that new actors have the same direction as parent
+        new_actors = sim.actors[initial_count:]
+        self.assertGreater(len(new_actors), 0, "No actors were spawned")
+        
+        for actor in new_actors:
+            self.assertAlmostEqual(actor.angle, parent_angle, places=5,
+                                 msg="Spawned actor should have same angle as parent with zero deviation")
+    
+    def test_direction_inheritance_with_deviation(self):
+        """Test that spawned actors inherit parent direction with configurable deviation."""
+        # Set a fresh random seed for this test to ensure consistency
+        random.seed(123)
+        
+        deviation = math.pi / 6  # 30 degrees
+        sim = PhysarumSimulation(
+            width=100, height=100, num_actors=1, decay_rate=0.01,
+            spawn_probability=1.0, direction_deviation=deviation
+        )
+        
+        # Set parent actor to specific direction
+        parent_angle = math.pi / 2  # 90 degrees
+        sim.actors[0].angle = parent_angle
+        
+        # Force spawning once and test
+        initial_count = len(sim.actors)
+        sim._handle_spawning()
+        new_actors = sim.actors[initial_count:]
+        
+        self.assertGreater(len(new_actors), 0, "No actors were spawned")
+        
+        # Check that all spawned angles are within deviation range
+        for actor in new_actors:
+            angle = actor.angle
+            # Verify deviation is within expected range directly
+            expected_min = parent_angle - deviation
+            expected_max = parent_angle + deviation
+            self.assertTrue(expected_min <= angle <= expected_max,
+                          f"Spawned angle {angle} ({math.degrees(angle):.1f}°) not in expected range "
+                          f"[{expected_min:.3f}, {expected_max:.3f}] "
+                          f"({math.degrees(expected_min):.1f}°, {math.degrees(expected_max):.1f}°)")
+            
+            # Additional check: deviation from parent should be within bounds
+            deviation_from_parent = abs(angle - parent_angle)
+            self.assertLessEqual(deviation_from_parent, deviation + 0.001,
+                               f"Deviation {deviation_from_parent:.3f} ({math.degrees(deviation_from_parent):.1f}°) "
+                               f"exceeds maximum {deviation:.3f} ({math.degrees(deviation):.1f}°)")
+    
+    def test_direction_inheritance_parameter_validation(self):
+        """Test that direction deviation parameter is validated correctly."""
+        # Test negative deviation (should raise error)
+        with self.assertRaises(ValueError):
+            PhysarumSimulation(
+                width=100, height=100, num_actors=1, decay_rate=0.01,
+                direction_deviation=-0.1
+            )
+        
+        # Test deviation > π (should raise error)
+        with self.assertRaises(ValueError):
+            PhysarumSimulation(
+                width=100, height=100, num_actors=1, decay_rate=0.01,
+                direction_deviation=4.0
+            )
+        
+        # Test valid deviation (should not raise error)
+        try:
+            sim = PhysarumSimulation(
+                width=100, height=100, num_actors=1, decay_rate=0.01,
+                direction_deviation=math.pi / 4
+            )
+            self.assertEqual(sim.direction_deviation, math.pi / 4)
+        except ValueError:
+            self.fail("Valid direction deviation should not raise ValueError")
+    
+    def test_direction_inheritance_with_multiple_parents(self):
+        """Test that multiple parents spawn with correct direction inheritance."""
+        deviation = math.pi / 8  # 22.5 degrees
+        sim = PhysarumSimulation(
+            width=100, height=100, num_actors=3, decay_rate=0.01,
+            spawn_probability=1.0, direction_deviation=deviation
+        )
+        
+        # Set different angles for each parent
+        parent_angles = [0, math.pi / 2, math.pi]
+        for i, angle in enumerate(parent_angles):
+            sim.actors[i].angle = angle
+        
+        # Force spawning
+        initial_count = len(sim.actors)
+        sim._handle_spawning()
+        new_actors = sim.actors[initial_count:]
+        
+        self.assertGreater(len(new_actors), 0, "No actors were spawned")
+        
+        # Check that spawned actors have angles close to their parents
+        # Note: We can't directly match parent to child, but we can verify
+        # that all spawned angles are close to at least one parent angle
+        for new_actor in new_actors:
+            found_close_parent = False
+            for parent_angle in parent_angles:
+                angle_diff = abs(new_actor.angle - parent_angle)
+                angle_diff = min(angle_diff, 2 * math.pi - angle_diff)
+                if angle_diff <= deviation + 0.001:  # Small tolerance
+                    found_close_parent = True
+                    break
+            
+            self.assertTrue(found_close_parent, 
+                          f"Spawned actor angle {new_actor.angle} is not close to any parent angle")
+    
+    def test_direction_inheritance_triangular_distribution(self):
+        """Test that spawned actors use triangular distribution for direction deviation."""
+        # Set a specific random seed for reproducible results
+        random.seed(456)
+        
+        deviation = math.pi / 4  # 45 degrees
+        sim = PhysarumSimulation(
+            width=100, height=100, num_actors=1, decay_rate=0.01,
+            spawn_probability=1.0, direction_deviation=deviation
+        )
+        
+        # Set parent actor to specific direction
+        parent_angle = math.pi / 2  # 90 degrees
+        sim.actors[0].angle = parent_angle
+        
+        # Collect many samples to test distribution shape
+        deviations = []
+        for _ in range(200):
+            # Reset to single actor and spawn
+            sim.actors = [sim.actors[0]]  # Keep only the parent
+            initial_count = len(sim.actors)
+            sim._handle_spawning()
+            new_actors = sim.actors[initial_count:]
+            
+            for actor in new_actors:
+                deviation_from_parent = actor.angle - parent_angle
+                deviations.append(deviation_from_parent)
+        
+        self.assertGreater(len(deviations), 0, "No deviations collected")
+        
+        # Test that all deviations are within bounds
+        for dev in deviations:
+            self.assertTrue(-deviation <= dev <= deviation,
+                          f"Deviation {dev} outside bounds [-{deviation}, {deviation}]")
+        
+        # Test triangular distribution properties:
+        # 1. More values should be closer to 0 than to the extremes
+        close_to_zero = sum(1 for dev in deviations if abs(dev) <= deviation / 3)
+        close_to_extremes = sum(1 for dev in deviations if abs(dev) >= 2 * deviation / 3)
+        
+        # With triangular distribution, there should be more samples close to zero
+        self.assertGreater(close_to_zero, close_to_extremes,
+                         "Triangular distribution should have more values near zero than near extremes")
+        
+        # 2. Mean should be close to 0 (parent angle)
+        mean_deviation = sum(deviations) / len(deviations)
+        self.assertAlmostEqual(mean_deviation, 0.0, delta=0.1,
+                             msg="Mean deviation should be close to 0 with triangular distribution")
 
 
 if __name__ == '__main__':
