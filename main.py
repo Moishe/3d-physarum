@@ -53,6 +53,8 @@ Examples:
                           help='Probability of spawning new actors from existing locations (default: 0.005)')
     sim_group.add_argument('--diffusion-rate', type=float, default=0.0, metavar='F',
                           help='Pheromone diffusion rate 0.0-1.0 (default: 0.0 - no diffusion)')
+    sim_group.add_argument('--image', type=str, metavar='PATH',
+                          help='JPEG image path for initial actor placement (overrides --actors)')
     
     # 3D model parameters
     model_group = parser.add_argument_group('3D Model Parameters')
@@ -103,10 +105,18 @@ def validate_parameters(args):
         errors.append("Height must be positive")
     
     # Actor parameters
-    if args.actors <= 0:
-        errors.append("Number of actors must be positive")
+    if args.image is None and args.actors <= 0:
+        errors.append("Number of actors must be positive when no image is provided")
     if args.steps <= 0:
         errors.append("Number of steps must be positive")
+    
+    # Image validation
+    if args.image:
+        import os
+        if not os.path.exists(args.image):
+            errors.append(f"Image file does not exist: {args.image}")
+        elif not args.image.lower().endswith(('.jpg', '.jpeg')):
+            errors.append("Image file must be a JPEG (.jpg or .jpeg)")
     
     # Rates and distances
     if args.decay < 0 or args.decay > 1:
@@ -162,7 +172,10 @@ def run_simulation_with_3d_generation(args):
         print("3D Physarum Model Generator")
         print("=" * 40)
         print(f"Grid size: {args.width}x{args.height}")
-        print(f"Actors: {args.actors}")
+        if args.image:
+            print(f"Initialization: Image-based ({args.image})")
+        else:
+            print(f"Actors: {args.actors}")
         print(f"Steps: {args.steps}")
         print(f"Decay rate: {args.decay}")
         print(f"Diffusion rate: {args.diffusion_rate}")
@@ -196,7 +209,8 @@ def run_simulation_with_3d_generation(args):
         initial_diameter=args.initial_diameter,
         death_probability=args.death_probability,
         spawn_probability=args.spawn_probability,
-        diffusion_rate=args.diffusion_rate
+        diffusion_rate=args.diffusion_rate,
+        image_path=args.image
     )
     
     # Create 3D model generator (smooth or voxel-based)

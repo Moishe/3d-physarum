@@ -2,9 +2,10 @@
 # ABOUTME: Implements actors/agents with sensing, movement, and trail deposition mechanics
 
 import numpy as np
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import random
 import math
+from PIL import Image
 
 
 class PhysarumGrid:
@@ -248,13 +249,14 @@ class PhysarumSimulation:
     def __init__(self, width: int, height: int, num_actors: int, decay_rate: float, 
                  view_radius: int = 3, view_distance: int = 10, speed: float = 1.0,
                  initial_diameter: float = 20.0, death_probability: float = 0.001,
-                 spawn_probability: float = 0.005, diffusion_rate: float = 0.0):
+                 spawn_probability: float = 0.005, diffusion_rate: float = 0.0,
+                 image_path: Optional[str] = None):
         """Initialize the Physarum simulation.
         
         Args:
             width: Grid width
             height: Grid height
-            num_actors: Number of actors to create
+            num_actors: Number of actors to create (ignored if image_path is provided)
             decay_rate: Trail decay rate (0.0 to 1.0)
             view_radius: Sensor radius for actors
             view_distance: Sensor distance for actors
@@ -263,12 +265,13 @@ class PhysarumSimulation:
             death_probability: Base probability of actor death per step
             spawn_probability: Probability of spawning new actors per step
             diffusion_rate: Rate of pheromone diffusion (0.0 to 1.0)
+            image_path: Path to JPEG image for initial actor placement (overrides num_actors)
         """
         # Validate parameters
         if width <= 0 or height <= 0:
             raise ValueError("Grid dimensions must be positive")
-        if num_actors <= 0:
-            raise ValueError("Number of actors must be positive")
+        if image_path is None and num_actors <= 0:
+            raise ValueError("Number of actors must be positive when no image is provided")
         if decay_rate < 0 or decay_rate > 1:
             raise ValueError("Decay rate must be between 0 and 1")
         if diffusion_rate < 0 or diffusion_rate > 1:
@@ -284,8 +287,11 @@ class PhysarumSimulation:
         self.view_distance = view_distance
         self.actors = []
         
-        # Create actors in a circular pattern
-        self._create_initial_actors(num_actors, initial_diameter, width, height)
+        # Create actors based on image or circular pattern
+        if image_path:
+            self._create_actors_from_image(image_path, width, height)
+        else:
+            self._create_initial_actors(num_actors, initial_diameter, width, height)
     
     def _create_initial_actors(self, num_actors: int, diameter: float, width: int, height: int) -> None:
         """Create initial actors arranged in a circle.
@@ -326,6 +332,59 @@ class PhysarumSimulation:
             actor_angle = random.uniform(0, 2 * math.pi)
             actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance)
             self.actors.append(actor)
+    
+    def _create_actors_from_image(self, image_path: str, width: int, height: int) -> None:
+        """Create actors from black pixels in an image.
+        
+        Args:
+            image_path: Path to the image file (JPEG, PNG, etc.)
+            width: Target grid width
+            height: Target grid height
+        """
+        try:
+            # Load and convert image to RGB
+            image = Image.open(image_path).convert('RGB')
+            img_array = np.array(image)
+            
+            # Get image dimensions
+            img_height, img_width = img_array.shape[:2]
+            
+            # Calculate the region to use based on width/height constraints
+            if width < img_width or height < img_height:
+                # Use center crop if target is smaller than image
+                start_x = max(0, (img_width - width) // 2)
+                start_y = max(0, (img_height - height) // 2)
+                end_x = min(img_width, start_x + width)
+                end_y = min(img_height, start_y + height)
+                
+                # Extract the center region
+                cropped_img = img_array[start_y:end_y, start_x:end_x]
+            else:
+                # Image is smaller than target, will be centered in grid
+                cropped_img = img_array
+            
+            # Calculate offset for centering smaller images in larger grids
+            offset_x = max(0, (width - cropped_img.shape[1]) // 2)
+            offset_y = max(0, (height - cropped_img.shape[0]) // 2)
+            
+            # Find black pixels (RGB values all < 16)
+            black_pixels = np.all(cropped_img < 16, axis=2)
+            
+            # Create actors for each black pixel
+            y_coords, x_coords = np.where(black_pixels)
+            
+            for y, x in zip(y_coords, x_coords):
+                # Apply offset to center the image in the grid
+                actor_x = float(x + offset_x)
+                actor_y = float(y + offset_y)
+                
+                # Random orientation for each actor
+                actor_angle = random.uniform(0, 2 * math.pi)
+                actor = PhysarumActor(actor_x, actor_y, actor_angle, self.view_radius, self.view_distance)
+                self.actors.append(actor)
+                
+        except Exception as e:
+            raise ValueError(f"Failed to load image {image_path}: {e}")
     
     def step(self) -> None:
         """Perform one simulation step."""
