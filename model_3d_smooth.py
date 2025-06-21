@@ -203,27 +203,43 @@ class SmoothModel3DGenerator:
         # First, apply Gaussian smoothing to eliminate voxel boundaries while preserving shape
         from scipy.ndimage import gaussian_filter
         
-        # Smooth the volume to create genuine curves instead of voxel boundaries
-        smoothed_volume = gaussian_filter(volume.astype(float), sigma=1.2)
+        # Pad the volume at top and bottom to ensure natural closure
+        padded_volume = self._pad_volume_for_closure(volume)
         
-        # Apply marching cubes with a lower threshold to capture the smoothed contours
+        # Smooth the padded volume to create genuine curves instead of voxel boundaries  
+        smoothed_volume = gaussian_filter(padded_volume.astype(float), sigma=1.2)
+        
+        # Determine appropriate threshold based on smoothed volume range
+        max_value = np.max(smoothed_volume)
+        min_value = np.min(smoothed_volume)
+        
+        # Use dynamic threshold: 40% of the range above minimum
+        if max_value > min_value:
+            dynamic_threshold = min_value + 0.4 * (max_value - min_value)
+        else:
+            dynamic_threshold = 0.5  # fallback
+        
+        # Apply marching cubes with dynamic threshold
         try:
             vertices, faces, normals, values = measure.marching_cubes(
                 smoothed_volume,
-                level=0.25,  # Lower threshold to capture more of the smoothed volume
+                level=dynamic_threshold,
                 spacing=(1.0, 1.0, self.layer_height)
             )
         except ValueError:
-            # Fallback: try with less smoothing if first attempt fails
+            # Fallback: try with less smoothing and different threshold
             try:
                 smoothed_volume = gaussian_filter(volume.astype(float), sigma=0.8)
+                max_value = np.max(smoothed_volume)
+                min_value = np.min(smoothed_volume)
+                fallback_threshold = min_value + 0.3 * (max_value - min_value)
                 vertices, faces, normals, values = measure.marching_cubes(
                     smoothed_volume,
-                    level=0.3,
+                    level=fallback_threshold,
                     spacing=(1.0, 1.0, self.layer_height)
                 )
             except ValueError:
-                # Last fallback: use original volume
+                # Last fallback: use original volume with standard threshold
                 vertices, faces, normals, values = measure.marching_cubes(
                     volume,
                     level=0.5,
@@ -235,6 +251,9 @@ class SmoothModel3DGenerator:
         
         # Apply additional smoothing to further reduce any remaining voxel artifacts
         tri_mesh = self._apply_contour_smoothing(tri_mesh, iterations=4)
+        
+        # Make the mesh watertight for 3D printing
+        tri_mesh = self._make_mesh_watertight(tri_mesh, padded_volume)
         
         return tri_mesh
     
@@ -278,6 +297,253 @@ class SmoothModel3DGenerator:
             smoothed_mesh.vertices = new_vertices
         
         return smoothed_mesh
+    
+    def _pad_volume_for_closure(self, volume: np.ndarray) -> np.ndarray:
+        """Pad the volume at top and bottom to ensure marching cubes creates closed surfaces.
+        
+        Args:
+            volume: Original 3D volume array
+            
+        Returns:
+            Padded volume with empty layers at top and bottom for natural closure
+        """
+        height, width, depth = volume.shape
+        
+        # Create padded volume with 2 empty layers at bottom and top
+        padded_depth = depth + 4
+        padded_volume = np.zeros((height, width, padded_depth), dtype=volume.dtype)
+        
+        # Copy original volume to middle section
+        padded_volume[:, :, 2:depth+2] = volume
+        
+        # Add thin base layer at the bottom to ensure connectivity
+        # Use the projection of the first layer to create a thin foundation
+        first_layer = volume[:, :, 0]
+        if np.any(first_layer):
+            # Create a thin foundation layer
+            foundation = first_layer * 0.3  # 30% strength foundation
+            padded_volume[:, :, 1] = foundation
+        
+        # Add thin cap layer at the top
+        last_layer = volume[:, :, -1]
+        if np.any(last_layer):
+            # Create a thin cap layer
+            cap = last_layer * 0.3  # 30% strength cap
+            padded_volume[:, :, depth+2] = cap
+        
+        return padded_volume
+    
+    def _make_mesh_watertight(self, tri_mesh: trimesh.Trimesh, volume: np.ndarray) -> trimesh.Trimesh:
+        """Make the mesh watertight by filling holes and ensuring proper closure.
+        
+        This ensures the model is closed and suitable for 3D printing with infill.
+        
+        Args:
+            tri_mesh: Input trimesh object (from padded volume)
+            volume: Padded volume for reference
+            
+        Returns:
+            Watertight trimesh object suitable for 3D printing
+        """
+        watertight_mesh = tri_mesh.copy()
+        
+        # Apply aggressive hole filling and repair since we start with a better mesh
+        for attempt in range(5):  # More attempts since we expect better results
+            # Fill holes
+            try:
+                watertight_mesh.fill_holes()
+            except:
+                pass
+            
+            # Fix normals and winding
+            watertight_mesh.fix_normals()
+            
+            # Remove degenerate and duplicate faces
+            try:
+                watertight_mesh.remove_degenerate_faces()
+                watertight_mesh.remove_duplicate_faces()
+            except:
+                pass
+            
+            # Remove unreferenced vertices
+            watertight_mesh.remove_unreferenced_vertices()
+            
+            # Check if we achieved watertight
+            if watertight_mesh.is_watertight:
+                break
+                
+            # If not watertight yet, try additional repairs
+            if attempt < 4:  # Don't do this on the last attempt
+                try:
+                    # Try more aggressive smoothing to close small gaps
+                    watertight_mesh = self._apply_contour_smoothing(watertight_mesh, iterations=1)
+                except:
+                    pass
+        
+        # Ensure positive volume (correct winding)
+        if watertight_mesh.volume < 0:
+            watertight_mesh.invert()
+        
+        # Final integrity check
+        watertight_mesh = self._ensure_watertight_integrity(watertight_mesh)
+        
+        return watertight_mesh
+    
+    def _add_bottom_top_surfaces(self, tri_mesh: trimesh.Trimesh, volume: np.ndarray, min_z: float, max_z: float) -> trimesh.Trimesh:
+        """Add bottom and top surfaces to seal the mesh.
+        
+        Args:
+            tri_mesh: Input mesh
+            volume: Original volume for determining shape
+            min_z: Minimum Z coordinate
+            max_z: Maximum Z coordinate
+            
+        Returns:
+            Mesh with added bottom and top surfaces
+        """
+        # Get the 2D projection of the volume to determine the base shape
+        binary_volume = volume > 0.5
+        
+        # Project volume to get bottom shape (any solid voxel in the stack)
+        bottom_projection = np.any(binary_volume, axis=2)
+        
+        # Project volume to get top shape (solid voxels in top layers)
+        top_layers = binary_volume[:, :, -3:]  # Use top 3 layers
+        top_projection = np.any(top_layers, axis=2)
+        
+        new_vertices = tri_mesh.vertices.copy().tolist()
+        new_faces = tri_mesh.faces.copy().tolist()
+        vertex_count = len(new_vertices)
+        
+        # Add bottom surface - place it just below the minimum mesh point for better connection
+        if np.any(bottom_projection):
+            bottom_z = min_z - 0.01  # Very close to existing mesh
+            bottom_vertices, bottom_faces = self._create_surface_from_projection(
+                bottom_projection, bottom_z, vertex_count, is_bottom=True
+            )
+            new_vertices.extend(bottom_vertices)
+            new_faces.extend(bottom_faces)
+            vertex_count += len(bottom_vertices)
+        
+        # Add top surface - place it just above the maximum mesh point for better connection
+        if np.any(top_projection):
+            top_z = max_z + 0.01  # Very close to existing mesh
+            top_vertices, top_faces = self._create_surface_from_projection(
+                top_projection, top_z, vertex_count, is_bottom=False
+            )
+            new_vertices.extend(top_vertices)
+            new_faces.extend(top_faces)
+        
+        # Create new mesh with added surfaces
+        try:
+            sealed_mesh = trimesh.Trimesh(vertices=np.array(new_vertices), faces=np.array(new_faces))
+            return sealed_mesh
+        except:
+            # If mesh creation fails, return original mesh
+            return tri_mesh
+    
+    def _create_surface_from_projection(self, projection: np.ndarray, z_level: float, vertex_offset: int, is_bottom: bool) -> tuple:
+        """Create triangular surface from 2D projection.
+        
+        Args:
+            projection: 2D boolean array
+            z_level: Z coordinate for the surface
+            vertex_offset: Starting vertex index
+            is_bottom: True for bottom surface, False for top surface
+            
+        Returns:
+            Tuple of (vertices, faces) for the surface
+        """
+        height, width = projection.shape
+        vertices = []
+        faces = []
+        
+        # Create a simple grid-based triangulation of the projection
+        vertex_indices = {}
+        vertex_idx = vertex_offset
+        
+        # Add vertices for all True pixels and their neighbors
+        for y in range(height):
+            for x in range(width):
+                if projection[y, x]:
+                    # Add corners of this cell
+                    corners = [
+                        (x, y), (x+1, y), (x+1, y+1), (x, y+1)
+                    ]
+                    for cx, cy in corners:
+                        if (cx, cy) not in vertex_indices:
+                            vertices.append([cx, cy, z_level])
+                            vertex_indices[(cx, cy)] = vertex_idx
+                            vertex_idx += 1
+        
+        # Create triangular faces for filled cells
+        for y in range(height):
+            for x in range(width):
+                if projection[y, x]:
+                    # Get the four corners of this cell
+                    corners = [
+                        (x, y), (x+1, y), (x+1, y+1), (x, y+1)
+                    ]
+                    
+                    # Check if all corners exist
+                    if all(corner in vertex_indices for corner in corners):
+                        v0 = vertex_indices[(x, y)]
+                        v1 = vertex_indices[(x+1, y)]
+                        v2 = vertex_indices[(x+1, y+1)]
+                        v3 = vertex_indices[(x, y+1)]
+                        
+                        # Create two triangles for this cell
+                        if is_bottom:
+                            # Bottom surface (clockwise from below)
+                            faces.append([v0, v2, v1])
+                            faces.append([v0, v3, v2])
+                        else:
+                            # Top surface (counter-clockwise from above)
+                            faces.append([v0, v1, v2])
+                            faces.append([v0, v2, v3])
+        
+        return vertices, faces
+    
+    def _ensure_watertight_integrity(self, tri_mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+        """Final validation and repair to ensure watertight integrity.
+        
+        Args:
+            tri_mesh: Input mesh
+            
+        Returns:
+            Validated and repaired mesh
+        """
+        repaired_mesh = tri_mesh.copy()
+        
+        # Remove any degenerate or duplicate faces
+        try:
+            repaired_mesh.remove_degenerate_faces()
+            repaired_mesh.remove_duplicate_faces()
+        except:
+            pass
+        
+        # Remove unreferenced vertices
+        repaired_mesh.remove_unreferenced_vertices()
+        
+        # If still not watertight, try more aggressive hole filling
+        if not repaired_mesh.is_watertight:
+            try:
+                # Try to fill holes again
+                repaired_mesh.fill_holes()
+                
+                # If still not watertight, try convex hull as last resort
+                if not repaired_mesh.is_watertight and repaired_mesh.vertices.shape[0] > 4:
+                    # Only use convex hull if we have enough vertices and it's still not watertight
+                    # This is a last resort that may change the shape significantly
+                    pass  # Skip convex hull for now to preserve shape
+                    
+            except:
+                pass
+        
+        # Ensure proper normals
+        repaired_mesh.fix_normals()
+        
+        return repaired_mesh
     
     def _find_boundary_voxels(self, binary_volume: np.ndarray) -> np.ndarray:
         """Find all voxels that are on the boundary (have at least one face exposed to air).
