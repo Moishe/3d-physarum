@@ -25,7 +25,7 @@ class SmoothModel3DGenerator:
             layer_height: Height of each simulation step in the Z-axis
             threshold: Minimum trail strength to include in 3D model
             smoothing_iterations: Number of smoothing iterations to apply
-            smoothing_type: Type of smoothing ('laplacian', 'taubin', 'feature_preserving')
+            smoothing_type: Type of smoothing ('laplacian', 'taubin', 'feature_preserving', 'boundary_outline')
             taubin_lambda: Lambda parameter for Taubin smoothing (shrinking factor)
             taubin_mu: Mu parameter for Taubin smoothing (anti-shrinking factor)
             preserve_features: Whether to preserve sharp features during smoothing
@@ -141,29 +141,33 @@ class SmoothModel3DGenerator:
         # Generate 3D volume
         volume = self._generate_volume()
         
-        # Apply marching cubes to extract isosurface
-        try:
-            vertices, faces, normals, values = measure.marching_cubes(
-                volume, 
-                level=0.5,  # Isosurface level
-                spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing
-            )
-        except ValueError as e:
-            # Fallback: if marching cubes fails, try with different level
+        # Use boundary outline method instead of marching cubes if requested
+        if self.smoothing_type == "boundary_outline":
+            tri_mesh = self._generate_boundary_outline_mesh(volume)
+        else:
+            # Apply marching cubes to extract isosurface
             try:
                 vertices, faces, normals, values = measure.marching_cubes(
                     volume, 
-                    level=0.1,
-                    spacing=(1.0, 1.0, self.layer_height)
+                    level=0.5,  # Isosurface level
+                    spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing
                 )
-            except ValueError:
-                raise ValueError(f"Failed to generate mesh with marching cubes: {e}")
+            except ValueError as e:
+                # Fallback: if marching cubes fails, try with different level
+                try:
+                    vertices, faces, normals, values = measure.marching_cubes(
+                        volume, 
+                        level=0.1,
+                        spacing=(1.0, 1.0, self.layer_height)
+                    )
+                except ValueError:
+                    raise ValueError(f"Failed to generate mesh with marching cubes: {e}")
+            
+            # Create trimesh object for processing
+            tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
         
-        # Create trimesh object for processing
-        tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-        
-        # Apply smoothing if requested
-        if self.smoothing_iterations > 0:
+        # Apply smoothing if requested (boundary_outline doesn't use traditional smoothing)
+        if self.smoothing_iterations > 0 and self.smoothing_type != "boundary_outline":
             if self.smoothing_type == "laplacian":
                 tri_mesh = self._apply_laplacian_smoothing(tri_mesh, self.smoothing_iterations)
             elif self.smoothing_type == "taubin":
@@ -182,6 +186,200 @@ class SmoothModel3DGenerator:
             stl_mesh.vectors[i] = tri_mesh.vertices[face]
         
         return stl_mesh
+    
+    def _generate_boundary_outline_mesh(self, volume: np.ndarray) -> trimesh.Trimesh:
+        """Generate mesh using boundary outline detection to eliminate blocky appearance.
+        
+        This method detects the outer boundary faces of the voxelized volume and creates
+        triangular faces only along the perimeter, eliminating the interior pixelated
+        structure while maintaining the overall form.
+        
+        Args:
+            volume: 3D volume array with binary voxel data
+            
+        Returns:
+            Trimesh object with boundary outline mesh
+        """
+        # Convert volume to binary
+        binary_volume = volume > 0.5
+        
+        # Find all boundary voxels (voxels with at least one face exposed to air)
+        boundary_voxels = self._find_boundary_voxels(binary_volume)
+        
+        # Generate faces only for boundary voxels, and only for faces that are exposed
+        triangles = []
+        height, width, depth = binary_volume.shape
+        
+        for z in range(depth):
+            for y in range(height):
+                for x in range(width):
+                    if boundary_voxels[y, x, z]:
+                        # This is a boundary voxel - generate exposed faces only
+                        exposed_faces = self._get_exposed_faces(binary_volume, x, y, z)
+                        voxel_triangles = self._create_boundary_voxel_faces(
+                            x, y, z, exposed_faces, self.layer_height
+                        )
+                        triangles.extend(voxel_triangles)
+        
+        if not triangles:
+            raise ValueError("No boundary faces found - volume may be empty")
+        
+        # Convert triangles to vertices and faces arrays
+        vertices = []
+        faces = []
+        vertex_map = {}  # Map vertex coordinates to indices for deduplication
+        
+        for triangle in triangles:
+            face_indices = []
+            for vertex in triangle:
+                # Convert to tuple for hashing
+                vertex_key = tuple(vertex)
+                if vertex_key not in vertex_map:
+                    vertex_map[vertex_key] = len(vertices)
+                    vertices.append(vertex)
+                face_indices.append(vertex_map[vertex_key])
+            faces.append(face_indices)
+        
+        # Create trimesh object
+        tri_mesh = trimesh.Trimesh(vertices=np.array(vertices), faces=np.array(faces))
+        
+        return tri_mesh
+    
+    def _find_boundary_voxels(self, binary_volume: np.ndarray) -> np.ndarray:
+        """Find all voxels that are on the boundary (have at least one face exposed to air).
+        
+        Args:
+            binary_volume: 3D binary array representing solid voxels
+            
+        Returns:
+            3D boolean array marking boundary voxels
+        """
+        height, width, depth = binary_volume.shape
+        boundary = np.zeros_like(binary_volume, dtype=bool)
+        
+        for z in range(depth):
+            for y in range(height):
+                for x in range(width):
+                    if binary_volume[y, x, z]:
+                        # Check if any of the 6 neighbors is empty (air)
+                        is_boundary = False
+                        
+                        # Check all 6 directions
+                        neighbors = [
+                            (x-1, y, z), (x+1, y, z),  # left, right
+                            (x, y-1, z), (x, y+1, z),  # back, front  
+                            (x, y, z-1), (x, y, z+1),  # bottom, top
+                        ]
+                        
+                        for nx, ny, nz in neighbors:
+                            # If neighbor is outside bounds or empty, this is a boundary voxel
+                            if (nx < 0 or nx >= width or 
+                                ny < 0 or ny >= height or 
+                                nz < 0 or nz >= depth or 
+                                not binary_volume[ny, nx, nz]):
+                                is_boundary = True
+                                break
+                        
+                        boundary[y, x, z] = is_boundary
+        
+        return boundary
+    
+    def _get_exposed_faces(self, binary_volume: np.ndarray, x: int, y: int, z: int) -> list:
+        """Get list of faces that are exposed to air for a boundary voxel.
+        
+        Args:
+            binary_volume: 3D binary array representing solid voxels
+            x, y, z: Coordinates of the voxel
+            
+        Returns:
+            List of face names that are exposed ('left', 'right', 'back', 'front', 'bottom', 'top')
+        """
+        height, width, depth = binary_volume.shape
+        exposed = []
+        
+        # Check each of the 6 faces
+        face_checks = [
+            ('left', x-1, y, z),
+            ('right', x+1, y, z), 
+            ('back', x, y-1, z),
+            ('front', x, y+1, z),
+            ('bottom', x, y, z-1),
+            ('top', x, y, z+1),
+        ]
+        
+        for face_name, nx, ny, nz in face_checks:
+            # Face is exposed if neighbor is outside bounds or empty
+            if (nx < 0 or nx >= width or 
+                ny < 0 or ny >= height or 
+                nz < 0 or nz >= depth or 
+                not binary_volume[ny, nx, nz]):
+                exposed.append(face_name)
+        
+        return exposed
+    
+    def _create_boundary_voxel_faces(self, x: int, y: int, z: int, exposed_faces: list, layer_height: float) -> list:
+        """Create triangular faces for exposed faces of a boundary voxel.
+        
+        Args:
+            x, y, z: Voxel coordinates
+            exposed_faces: List of face names that are exposed
+            layer_height: Height scaling for Z coordinate
+            
+        Returns:
+            List of triangular faces as numpy arrays
+        """
+        triangles = []
+        
+        # Define the 8 vertices of the voxel cube with proper Z scaling
+        z_bottom = z * layer_height
+        z_top = z_bottom + layer_height
+        
+        vertices = [
+            [x, y, z_bottom],       # 0: bottom-left-back
+            [x+1, y, z_bottom],     # 1: bottom-right-back  
+            [x+1, y+1, z_bottom],   # 2: bottom-right-front
+            [x, y+1, z_bottom],     # 3: bottom-left-front
+            [x, y, z_top],          # 4: top-left-back
+            [x+1, y, z_top],        # 5: top-right-back
+            [x+1, y+1, z_top],      # 6: top-right-front
+            [x, y+1, z_top],        # 7: top-left-front
+        ]
+        
+        # Define faces and their triangulation
+        face_triangles = {
+            'bottom': [
+                [vertices[0], vertices[1], vertices[2]],
+                [vertices[0], vertices[2], vertices[3]]
+            ],
+            'top': [
+                [vertices[4], vertices[6], vertices[5]], 
+                [vertices[4], vertices[7], vertices[6]]
+            ],
+            'front': [
+                [vertices[3], vertices[2], vertices[6]],
+                [vertices[3], vertices[6], vertices[7]]
+            ],
+            'back': [
+                [vertices[0], vertices[4], vertices[5]],
+                [vertices[0], vertices[5], vertices[1]]
+            ],
+            'right': [
+                [vertices[1], vertices[5], vertices[6]],
+                [vertices[1], vertices[6], vertices[2]]
+            ],
+            'left': [
+                [vertices[0], vertices[3], vertices[7]],
+                [vertices[0], vertices[7], vertices[4]]
+            ]
+        }
+        
+        # Add triangles for exposed faces only
+        for face_name in exposed_faces:
+            if face_name in face_triangles:
+                for triangle_vertices in face_triangles[face_name]:
+                    triangles.append(np.array(triangle_vertices))
+        
+        return triangles
     
     def _apply_laplacian_smoothing(self, tri_mesh: trimesh.Trimesh, iterations: int) -> trimesh.Trimesh:
         """Apply Laplacian smoothing to the mesh.
@@ -502,24 +700,28 @@ class SmoothModel3DGenerator:
         # Generate 3D volume
         volume = self._generate_volume()
         
-        # Apply marching cubes
-        vertices, faces, normals, values = measure.marching_cubes(
-            volume, 
-            level=0.5,
-            spacing=(1.0, 1.0, self.layer_height)
-        )
-        
-        # Create trimesh object
-        tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-        
-        # Apply smoothing if requested
-        if self.smoothing_iterations > 0:
-            if self.smoothing_type == "laplacian":
-                tri_mesh = self._apply_laplacian_smoothing(tri_mesh, self.smoothing_iterations)
-            elif self.smoothing_type == "taubin":
-                tri_mesh = self._apply_taubin_smoothing(tri_mesh, self.smoothing_iterations)
-            elif self.smoothing_type == "feature_preserving":
-                tri_mesh = self._apply_feature_preserving_smoothing(tri_mesh, self.smoothing_iterations)
+        # Use boundary outline method instead of marching cubes if requested
+        if self.smoothing_type == "boundary_outline":
+            tri_mesh = self._generate_boundary_outline_mesh(volume)
+        else:
+            # Apply marching cubes
+            vertices, faces, normals, values = measure.marching_cubes(
+                volume, 
+                level=0.5,
+                spacing=(1.0, 1.0, self.layer_height)
+            )
+            
+            # Create trimesh object
+            tri_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+            
+            # Apply smoothing if requested
+            if self.smoothing_iterations > 0:
+                if self.smoothing_type == "laplacian":
+                    tri_mesh = self._apply_laplacian_smoothing(tri_mesh, self.smoothing_iterations)
+                elif self.smoothing_type == "taubin":
+                    tri_mesh = self._apply_taubin_smoothing(tri_mesh, self.smoothing_iterations)
+                elif self.smoothing_type == "feature_preserving":
+                    tri_mesh = self._apply_feature_preserving_smoothing(tri_mesh, self.smoothing_iterations)
         
         # Validate and repair
         tri_mesh = self._validate_and_repair_mesh(tri_mesh)
@@ -597,7 +799,7 @@ def generate_smooth_3d_model_from_simulation(width: int, height: int, num_actors
         layer_height: Height of each layer in 3D model
         threshold: Minimum trail strength for inclusion
         smoothing_iterations: Number of smoothing iterations to apply
-        smoothing_type: Type of smoothing ('laplacian', 'taubin', 'feature_preserving')
+        smoothing_type: Type of smoothing ('laplacian', 'taubin', 'feature_preserving', 'boundary_outline')
         taubin_lambda: Lambda parameter for Taubin smoothing
         taubin_mu: Mu parameter for Taubin smoothing
         preserve_features: Whether to preserve sharp features

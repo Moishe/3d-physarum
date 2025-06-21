@@ -75,6 +75,39 @@ class TestSmoothModel3DGenerator:
         with pytest.raises(ValueError, match="Unknown smoothing type"):
             generator.generate_mesh()
     
+    def test_boundary_outline_smoothing(self):
+        """Test boundary outline smoothing algorithm."""
+        generator = SmoothModel3DGenerator(
+            self.simulation,
+            smoothing_type="boundary_outline"
+        )
+        
+        # Run simulation for a few steps
+        for i in range(15):
+            self.simulation.step()
+            if i % 3 == 0:
+                generator.capture_layer()
+        
+        # Ensure we have layers
+        assert generator.get_layer_count() > 0
+        
+        # Generate mesh with boundary outline
+        mesh = generator.generate_mesh()
+        
+        # Verify mesh has reasonable properties
+        assert mesh is not None
+        assert len(mesh.vectors) > 0
+        
+        # Get quality metrics
+        metrics = generator.get_mesh_quality_metrics()
+        assert 'vertex_count' in metrics
+        assert 'face_count' in metrics
+        assert metrics['vertex_count'] > 0
+        assert metrics['face_count'] > 0
+        
+        # Verify connectivity is maintained
+        assert generator.validate_connectivity()
+    
     def test_capture_layer(self):
         """Test layer capture functionality."""
         # Run a few simulation steps
@@ -535,7 +568,7 @@ class TestSmoothingAlgorithmComparison:
     
     def test_all_smoothing_algorithms_work(self):
         """Test that all smoothing algorithms produce valid meshes."""
-        algorithms = ['laplacian', 'taubin', 'feature_preserving']
+        algorithms = ['laplacian', 'taubin', 'feature_preserving', 'boundary_outline']
         
         for algorithm in algorithms:
             generator = generate_smooth_3d_model_from_simulation(

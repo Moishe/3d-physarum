@@ -24,6 +24,7 @@ Examples:
   %(prog)s --smooth --smoothing-iterations 3 --output smooth_model.stl
   %(prog)s --smooth --smoothing-type taubin --taubin-lambda 0.6 --mesh-quality
   %(prog)s --smooth --smoothing-type feature_preserving --preserve-features --feature-angle 45
+  %(prog)s --smooth --smoothing-type boundary_outline --output outline_model.stl
         """
     )
     
@@ -71,7 +72,7 @@ Examples:
     model_group.add_argument('--smoothing-iterations', type=int, default=2, metavar='N',
                             help='Number of smoothing iterations for smooth surfaces (default: 2)')
     model_group.add_argument('--smoothing-type', type=str, default='taubin', 
-                            choices=['laplacian', 'taubin', 'feature_preserving'],
+                            choices=['laplacian', 'taubin', 'feature_preserving', 'boundary_outline'],
                             help='Type of smoothing algorithm (default: taubin)')
     model_group.add_argument('--taubin-lambda', type=float, default=0.5, metavar='F',
                             help='Taubin smoothing lambda parameter (default: 0.5)')
