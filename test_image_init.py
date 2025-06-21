@@ -62,9 +62,11 @@ class TestImageInitialization:
             # Should have exactly 3 actors (one per black pixel)
             assert len(sim.actors) == 3
             
-            # Check actor positions match black pixel locations
+            # Check actor positions match black pixel locations (with Y-coordinate flipped)
             actor_positions = [(int(actor.x), int(actor.y)) for actor in sim.actors]
-            for pos in black_pixels:
+            # Y-coordinates are flipped from image space to simulation space
+            expected_positions = [(x, 9 - y) for x, y in black_pixels]  # 9 = height - 1
+            for pos in expected_positions:
                 assert pos in actor_positions
                 
         finally:
@@ -86,10 +88,11 @@ class TestImageInitialization:
             # Should have 3 actors
             assert len(sim.actors) == 3
             
-            # Actors should be offset by centering calculation
+            # Actors should be offset by centering calculation with Y-coordinate flipping
             # Image is 6x4, grid is 10x8
             # Offset: ((10-6)//2, (8-4)//2) = (2, 2)
-            expected_positions = [(x + 2, y + 2) for x, y in black_pixels]
+            # Y-coordinates are flipped: (image_height - 1 - y) = (4 - 1 - y) = (3 - y)
+            expected_positions = [(x + 2, (3 - y) + 2) for x, y in black_pixels]
             actor_positions = [(int(actor.x), int(actor.y)) for actor in sim.actors]
             
             for pos in expected_positions:
@@ -115,9 +118,10 @@ class TestImageInitialization:
             # Center crop: from (2, 2) to (10, 8) for 8x6 grid
             assert len(sim.actors) == 3
             
-            # Actors should be offset by crop calculation
-            # Crop starts at ((12-8)//2, (10-6)//2) = (2, 2)
-            expected_positions = [(x - 2, y - 2) for x, y in black_pixels]
+            # Actors should be offset by crop calculation with Y-coordinate flipping
+            # Crop starts at ((12-8)//2, (10-6)//2) = (2, 2) 
+            # Y-coordinates are flipped in the 6-high cropped section: (5 - (y - 2)) = (7 - y)
+            expected_positions = [(x - 2, 7 - y) for x, y in black_pixels]
             actor_positions = [(int(actor.x), int(actor.y)) for actor in sim.actors]
             
             for pos in expected_positions:
@@ -149,11 +153,12 @@ class TestImageInitialization:
                 image_path=temp_file.name
             )
             
-            # Should detect 3 black pixels: (1,1), (2,2), (4,0)
+            # Should detect 3 black pixels: (1,1), (2,2), (4,0) with Y-coordinate flipped
             assert len(sim.actors) == 3
             
             actor_positions = {(int(actor.x), int(actor.y)) for actor in sim.actors}
-            expected_positions = {(1, 1), (2, 2), (4, 0)}
+            # Y-coordinates are flipped in the 5-high image: (4 - y) 
+            expected_positions = {(1, 3), (2, 2), (4, 4)}  # (1,4-1), (2,4-2), (4,4-0)
             
             assert actor_positions == expected_positions
             

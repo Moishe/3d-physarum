@@ -380,7 +380,8 @@ class PhysarumSimulation:
             for y, x in zip(y_coords, x_coords):
                 # Apply offset to center the image in the grid
                 actor_x = float(x + offset_x)
-                actor_y = float(y + offset_y)
+                # Flip Y-coordinate to convert from image space (top-left origin) to simulation space (bottom-left origin)
+                actor_y = float((cropped_img.shape[0] - 1 - y) + offset_y)
                 
                 # Random orientation for each actor
                 actor_angle = random.uniform(0, 2 * math.pi)
