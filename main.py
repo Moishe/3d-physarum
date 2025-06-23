@@ -84,6 +84,18 @@ Examples:
                             help='Feature edge angle threshold in degrees (default: 60.0)')
     model_group.add_argument('--mesh-quality', action='store_true',
                             help='Show detailed mesh quality metrics')
+    model_group.add_argument('--background', action='store_true',
+                            help='Add a solid rectangular background behind the simulation')
+    model_group.add_argument('--background-depth', type=float, default=2.0, metavar='F',
+                            help='Depth/thickness of the background layer (default: 2.0)')
+    model_group.add_argument('--background-margin', type=float, default=0.05, metavar='F',
+                            help='Background margin as fraction of simulation bounds (default: 0.05 = 5%)')
+    model_group.add_argument('--background-border', action='store_true',
+                            help='Add a raised border around the background edges')
+    model_group.add_argument('--border-height', type=float, default=1.0, metavar='F',
+                            help='Height of the border walls above the background (default: 1.0)')
+    model_group.add_argument('--border-thickness', type=float, default=0.5, metavar='F',
+                            help='Thickness of the border walls (default: 0.5)')
     
     # Output parameters
     output_group = parser.add_argument_group('Output Parameters')
@@ -147,6 +159,16 @@ def validate_parameters(args):
     if args.feature_angle <= 0 or args.feature_angle >= 180:
         errors.append("Feature angle must be between 0 and 180 degrees")
     
+    # Background parameters
+    if args.background_depth <= 0:
+        errors.append("Background depth must be positive")
+    if args.background_margin < 0 or args.background_margin > 1:
+        errors.append("Background margin must be between 0.0 and 1.0")
+    if args.border_height <= 0:
+        errors.append("Border height must be positive")
+    if args.border_thickness <= 0:
+        errors.append("Border thickness must be positive")
+    
     # Lifecycle parameters
     if args.initial_diameter <= 0:
         errors.append("Initial diameter must be positive")
@@ -172,6 +194,17 @@ def validate_parameters(args):
 
 def run_simulation_with_3d_generation(args):
     """Run the Physarum simulation and generate 3D model."""
+    
+    # If using an image but no dimensions specified, get dimensions from image
+    if args.image and args.width == 100 and args.height == 100:
+        # Check if these are still the default values
+        from PIL import Image
+        try:
+            with Image.open(args.image) as img:
+                args.width, args.height = img.size
+        except Exception as e:
+            print(f"Warning: Could not read image dimensions from {args.image}: {e}")
+            print("Using default 100x100 grid")
     
     if not args.quiet:
         print("3D Physarum Model Generator")
@@ -230,13 +263,25 @@ def run_simulation_with_3d_generation(args):
             taubin_lambda=args.taubin_lambda,
             taubin_mu=args.taubin_mu,
             preserve_features=args.preserve_features,
-            feature_angle=args.feature_angle
+            feature_angle=args.feature_angle,
+            background=args.background,
+            background_depth=args.background_depth,
+            background_margin=args.background_margin,
+            background_border=args.background_border,
+            border_height=args.border_height,
+            border_thickness=args.border_thickness
         )
     else:
         generator = Model3DGenerator(
             simulation=simulation,
             layer_height=args.layer_height,
-            threshold=args.threshold
+            threshold=args.threshold,
+            background=args.background,
+            background_depth=args.background_depth,
+            background_margin=args.background_margin,
+            background_border=args.background_border,
+            border_height=args.border_height,
+            border_thickness=args.border_thickness
         )
     
     if not args.quiet:

@@ -17,7 +17,10 @@ class SmoothModel3DGenerator:
                  threshold: float = 0.1, smoothing_iterations: int = 0,
                  smoothing_type: str = "laplacian", taubin_lambda: float = 0.5, 
                  taubin_mu: float = -0.52, preserve_features: bool = False,
-                 feature_angle: float = 60.0):
+                 feature_angle: float = 60.0, background: bool = False,
+                 background_depth: float = 2.0, background_margin: float = 0.05,
+                 background_border: bool = False, border_height: float = 1.0,
+                 border_thickness: float = 0.5):
         """Initialize the smooth 3D model generator.
         
         Args:
@@ -30,6 +33,12 @@ class SmoothModel3DGenerator:
             taubin_mu: Mu parameter for Taubin smoothing (anti-shrinking factor)
             preserve_features: Whether to preserve sharp features during smoothing
             feature_angle: Angle threshold (degrees) for feature preservation
+            background: Whether to add a solid rectangular background
+            background_depth: Depth/thickness of the background layer
+            background_margin: Background margin as fraction of simulation bounds
+            background_border: Whether to add a raised border around background edges
+            border_height: Height of the border walls above the background
+            border_thickness: Thickness of the border walls
         """
         self.simulation = simulation
         self.layer_height = layer_height
@@ -40,6 +49,12 @@ class SmoothModel3DGenerator:
         self.taubin_mu = taubin_mu
         self.preserve_features = preserve_features
         self.feature_angle = np.radians(feature_angle)
+        self.background = background
+        self.background_depth = background_depth
+        self.background_margin = background_margin
+        self.background_border = background_border
+        self.border_height = border_height
+        self.border_thickness = border_thickness
         self.layers = []  # Store simulation frames as layers
         
     def capture_layer(self) -> None:
@@ -109,7 +124,7 @@ class SmoothModel3DGenerator:
         """Generate 3D volume array from layer stack.
         
         Returns:
-            3D volume array suitable for marching cubes
+            3D volume array suitable for marching cubes with proper coordinate system
         """
         if not self.layers:
             raise ValueError("No layers captured. Call capture_layer() first.")
@@ -126,6 +141,11 @@ class SmoothModel3DGenerator:
         # Apply some smoothing to the volume to reduce stepping artifacts
         if depth > 2:  # Only smooth if we have enough layers
             volume = ndimage.gaussian_filter(volume, sigma=0.5)
+        
+        # Rotate volume 90 degrees counterclockwise to fix orientation
+        # This preserves text direction while fixing the 90-degree rotation
+        # np.rot90 rotates in the (height, width) plane, k=1 for 90 degrees counterclockwise
+        volume = np.rot90(volume, k=1, axes=(0, 1))
         
         return volume
     
@@ -150,7 +170,7 @@ class SmoothModel3DGenerator:
                 vertices, faces, normals, values = measure.marching_cubes(
                     volume, 
                     level=0.5,  # Isosurface level
-                    spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing
+                    spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (y, x, z) in original coordinates
                 )
             except ValueError as e:
                 # Fallback: if marching cubes fails, try with different level
@@ -158,7 +178,7 @@ class SmoothModel3DGenerator:
                     vertices, faces, normals, values = measure.marching_cubes(
                         volume, 
                         level=0.1,
-                        spacing=(1.0, 1.0, self.layer_height)
+                        spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (y, x, z) in original coordinates
                     )
                 except ValueError:
                     raise ValueError(f"Failed to generate mesh with marching cubes: {e}")
@@ -179,6 +199,10 @@ class SmoothModel3DGenerator:
         
         # Validate and repair mesh
         tri_mesh = self._validate_and_repair_mesh(tri_mesh)
+        
+        # Add background if requested
+        if self.background:
+            tri_mesh = self._add_background_to_smooth_mesh(tri_mesh)
         
         # Convert to STL mesh format
         stl_mesh = mesh.Mesh(np.zeros(len(tri_mesh.faces), dtype=mesh.Mesh.dtype))
@@ -224,7 +248,7 @@ class SmoothModel3DGenerator:
             vertices, faces, normals, values = measure.marching_cubes(
                 smoothed_volume,
                 level=dynamic_threshold,
-                spacing=(1.0, 1.0, self.layer_height)
+                spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (x, y, z) after transpose
             )
         except ValueError:
             # Fallback: try with less smoothing and different threshold
@@ -236,14 +260,14 @@ class SmoothModel3DGenerator:
                 vertices, faces, normals, values = measure.marching_cubes(
                     smoothed_volume,
                     level=fallback_threshold,
-                    spacing=(1.0, 1.0, self.layer_height)
+                    spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (y, x, z) in original coordinates
                 )
             except ValueError:
                 # Last fallback: use original volume with standard threshold
                 vertices, faces, normals, values = measure.marching_cubes(
                     volume,
                     level=0.5,
-                    spacing=(1.0, 1.0, self.layer_height)
+                    spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (y, x, z) in original coordinates
                 )
         
         # Create initial mesh
@@ -302,16 +326,16 @@ class SmoothModel3DGenerator:
         """Pad the volume at top and bottom to ensure marching cubes creates closed surfaces.
         
         Args:
-            volume: Original 3D volume array
+            volume: Transposed 3D volume array (width, height, depth)
             
         Returns:
             Padded volume with empty layers at top and bottom for natural closure
         """
-        height, width, depth = volume.shape
+        width, height, depth = volume.shape
         
         # Create padded volume with 2 empty layers at bottom and top
         padded_depth = depth + 4
-        padded_volume = np.zeros((height, width, padded_depth), dtype=volume.dtype)
+        padded_volume = np.zeros((width, height, padded_depth), dtype=volume.dtype)
         
         # Copy original volume to middle section
         padded_volume[:, :, 2:depth+2] = volume
@@ -916,6 +940,212 @@ class SmoothModel3DGenerator:
         
         return repaired_mesh
     
+    def _add_background_to_smooth_mesh(self, tri_mesh: trimesh.Trimesh) -> trimesh.Trimesh:
+        """Add background mesh to the smooth simulation mesh.
+        
+        Args:
+            tri_mesh: Smooth simulation mesh
+            
+        Returns:
+            Combined mesh with background
+        """
+        # Calculate bounds based on actual simulation content
+        content_bounds = self._get_simulation_content_bounds()
+        
+        # Apply margin to content bounds
+        content_width = content_bounds['x_max'] - content_bounds['x_min']
+        content_height = content_bounds['y_max'] - content_bounds['y_min']
+        margin_x = content_width * self.background_margin
+        margin_y = content_height * self.background_margin
+        
+        # Background extends beyond content bounds by margin
+        x_min = content_bounds['x_min'] - margin_x
+        x_max = content_bounds['x_max'] + margin_x
+        y_min = content_bounds['y_min'] - margin_y
+        y_max = content_bounds['y_max'] + margin_y
+        
+        # Background sits above all layers (after the last layer)
+        last_layer_z = len(self.layers) * self.layer_height
+        z_min = last_layer_z
+        z_max = last_layer_z + self.background_depth
+        
+        # Create background mesh as a simple box
+        background_box = trimesh.creation.box(
+            extents=[x_max - x_min, y_max - y_min, self.background_depth],
+            transform=trimesh.transformations.translation_matrix([
+                (x_min + x_max) / 2,
+                (y_min + y_max) / 2, 
+                z_min + self.background_depth / 2
+            ])
+        )
+        
+        # Add border if requested
+        meshes_to_combine = [tri_mesh, background_box]
+        if self.background_border:
+            border_meshes = self._create_border_meshes()
+            meshes_to_combine.extend(border_meshes)
+        
+        # Combine simulation mesh, background mesh, and border meshes
+        try:
+            # Use trimesh union operation for better results
+            combined_mesh = trimesh.util.concatenate(meshes_to_combine)
+            return combined_mesh
+        except:
+            # Fallback: manual combination if union fails
+            combined_mesh = tri_mesh
+            for mesh in meshes_to_combine[1:]:
+                combined_mesh = self._manually_combine_meshes(combined_mesh, mesh)
+            return combined_mesh
+    
+    def _manually_combine_meshes(self, mesh1: trimesh.Trimesh, mesh2: trimesh.Trimesh) -> trimesh.Trimesh:
+        """Manually combine two meshes by concatenating vertices and faces.
+        
+        Args:
+            mesh1: First mesh (simulation)
+            mesh2: Second mesh (background)
+            
+        Returns:
+            Combined mesh
+        """
+        # Combine vertices
+        combined_vertices = np.vstack([mesh1.vertices, mesh2.vertices])
+        
+        # Combine faces (adjust indices for second mesh)
+        mesh1_faces = mesh1.faces
+        mesh2_faces = mesh2.faces + len(mesh1.vertices)
+        combined_faces = np.vstack([mesh1_faces, mesh2_faces])
+        
+        # Create combined mesh
+        combined_mesh = trimesh.Trimesh(vertices=combined_vertices, faces=combined_faces)
+        
+        return combined_mesh
+    
+    def _create_border_meshes(self) -> List[trimesh.Trimesh]:
+        """Create border wall meshes around the background.
+        
+        Returns:
+            List of trimesh objects representing the border walls
+        """
+        if not self.background_border or not self.layers:
+            return []
+        
+        # Calculate bounds based on actual simulation content
+        content_bounds = self._get_simulation_content_bounds()
+        
+        # Apply margin to content bounds
+        content_width = content_bounds['x_max'] - content_bounds['x_min']
+        content_height = content_bounds['y_max'] - content_bounds['y_min']
+        margin_x = content_width * self.background_margin
+        margin_y = content_height * self.background_margin
+        
+        # Background outer bounds match content aspect ratio
+        x_min = content_bounds['x_min'] - margin_x
+        x_max = content_bounds['x_max'] + margin_x
+        y_min = content_bounds['y_min'] - margin_y
+        y_max = content_bounds['y_max'] + margin_y
+        
+        # Background sits above all layers
+        last_layer_z = len(self.layers) * self.layer_height
+        background_bottom = last_layer_z
+        background_top = last_layer_z + self.background_depth
+        border_bottom = background_bottom - self.border_height
+        
+        border_meshes = []
+        
+        # Create four border walls around the background (inset within background bounds)
+        # Front wall (y = y_max side) - inset from edge by border_thickness
+        front_wall = trimesh.creation.box(
+            extents=[x_max - x_min, self.border_thickness, self.border_height],
+            transform=trimesh.transformations.translation_matrix([
+                (x_min + x_max) / 2,
+                y_max - self.border_thickness / 2,
+                border_bottom + self.border_height / 2
+            ])
+        )
+        border_meshes.append(front_wall)
+        
+        # Back wall (y = y_min side) - inset from edge by border_thickness
+        back_wall = trimesh.creation.box(
+            extents=[x_max - x_min, self.border_thickness, self.border_height],
+            transform=trimesh.transformations.translation_matrix([
+                (x_min + x_max) / 2,
+                y_min + self.border_thickness / 2,
+                border_bottom + self.border_height / 2
+            ])
+        )
+        border_meshes.append(back_wall)
+        
+        # Right wall (x = x_max side) - inset from edge, only spans inner area
+        right_wall = trimesh.creation.box(
+            extents=[self.border_thickness, y_max - y_min - 2 * self.border_thickness, self.border_height],
+            transform=trimesh.transformations.translation_matrix([
+                x_max - self.border_thickness / 2,
+                (y_min + y_max) / 2,
+                border_bottom + self.border_height / 2
+            ])
+        )
+        border_meshes.append(right_wall)
+        
+        # Left wall (x = x_min side) - inset from edge, only spans inner area
+        left_wall = trimesh.creation.box(
+            extents=[self.border_thickness, y_max - y_min - 2 * self.border_thickness, self.border_height],
+            transform=trimesh.transformations.translation_matrix([
+                x_min + self.border_thickness / 2,
+                (y_min + y_max) / 2,
+                border_bottom + self.border_height / 2
+            ])
+        )
+        border_meshes.append(left_wall)
+        
+        return border_meshes
+    
+    def _get_simulation_content_bounds(self) -> dict:
+        """Get the bounding box of actual simulation content from the last layer.
+        
+        Returns:
+            Dictionary with x_min, x_max, y_min, y_max bounds of active content
+        """
+        if not self.layers:
+            # Fallback to full grid if no layers
+            return {
+                'x_min': 0,
+                'x_max': self.simulation.grid.width,
+                'y_min': 0,
+                'y_max': self.simulation.grid.height
+            }
+        
+        # Use the last layer to determine content bounds
+        last_layer = self.layers[-1]
+        
+        # Find all positions with active content
+        active_positions = np.where(last_layer)
+        
+        if len(active_positions[0]) == 0:
+            # No active content, fallback to full grid
+            return {
+                'x_min': 0,
+                'x_max': self.simulation.grid.width,
+                'y_min': 0,
+                'y_max': self.simulation.grid.height
+            }
+        
+        # Get bounds of active content
+        y_positions = active_positions[0]  # Row indices (image coordinates, 0 at top)
+        x_positions = active_positions[1]  # Column indices
+        
+        # Convert Y coordinates from image space (top-left origin) to simulation space (bottom-left origin)
+        # This matches the coordinate flip done in physarum.py when loading images
+        height = last_layer.shape[0]
+        simulation_y_positions = height - 1 - y_positions
+        
+        # Convert to actual coordinates (add 1 to max for inclusive bound)
+        return {
+            'x_min': float(np.min(x_positions)),
+            'x_max': float(np.max(x_positions) + 1),
+            'y_min': float(np.min(simulation_y_positions)),
+            'y_max': float(np.max(simulation_y_positions) + 1)
+        }
+    
     def _ensure_mesh_integrity(self, tri_mesh: trimesh.Trimesh) -> trimesh.Trimesh:
         """Ensure mesh has basic integrity for 3D printing.
         
@@ -1008,7 +1238,7 @@ class SmoothModel3DGenerator:
             vertices, faces, normals, values = measure.marching_cubes(
                 volume, 
                 level=0.5,
-                spacing=(1.0, 1.0, self.layer_height)
+                spacing=(1.0, 1.0, self.layer_height)  # Voxel spacing (x, y, z) after transpose
             )
             
             # Create trimesh object

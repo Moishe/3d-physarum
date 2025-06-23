@@ -12,17 +12,32 @@ class Model3DGenerator:
     """Generates 3D models from Physarum simulation data."""
     
     def __init__(self, simulation: PhysarumSimulation, layer_height: float = 1.0,
-                 threshold: float = 0.1):
+                 threshold: float = 0.1, background: bool = False, 
+                 background_depth: float = 2.0, background_margin: float = 0.05,
+                 background_border: bool = False, border_height: float = 1.0,
+                 border_thickness: float = 0.5):
         """Initialize the 3D model generator.
         
         Args:
             simulation: The Physarum simulation to generate models from
             layer_height: Height of each simulation step in the Z-axis
             threshold: Minimum trail strength to include in 3D model
+            background: Whether to add a solid rectangular background
+            background_depth: Depth/thickness of the background layer
+            background_margin: Background margin as fraction of simulation bounds
+            background_border: Whether to add a raised border around background edges
+            border_height: Height of the border walls above the background
+            border_thickness: Thickness of the border walls
         """
         self.simulation = simulation
         self.layer_height = layer_height
         self.threshold = threshold
+        self.background = background
+        self.background_depth = background_depth
+        self.background_margin = background_margin
+        self.background_border = background_border
+        self.border_height = border_height
+        self.border_thickness = border_thickness
         self.layers = []  # Store simulation frames as layers
         
     def capture_layer(self) -> None:
@@ -138,6 +153,16 @@ class Model3DGenerator:
         
         triangles = []
         
+        # Add background mesh if enabled
+        if self.background:
+            background_triangles = self._create_background_mesh()
+            triangles.extend(background_triangles)
+            
+            # Add border if enabled
+            if self.background_border:
+                border_triangles = self._create_border_mesh()
+                triangles.extend(border_triangles)
+        
         # Generate triangular faces for each voxel
         for layer_idx, layer_mask in enumerate(self.layers):
             z_bottom = layer_idx * self.layer_height
@@ -237,6 +262,254 @@ class Model3DGenerator:
             ])
         
         return triangles
+    
+    def _create_background_mesh(self) -> List[np.ndarray]:
+        """Create triangular faces for the background rectangular solid.
+        
+        Returns:
+            List of triangular faces as numpy arrays
+        """
+        if not self.background or not self.layers:
+            return []
+        
+        # Calculate bounds based on actual simulation content
+        content_bounds = self._get_simulation_content_bounds()
+        
+        # Apply margin to content bounds
+        content_width = content_bounds['x_max'] - content_bounds['x_min']
+        content_height = content_bounds['y_max'] - content_bounds['y_min']
+        margin_x = content_width * self.background_margin
+        margin_y = content_height * self.background_margin
+        
+        # Background extends beyond content bounds by margin
+        x_min = content_bounds['x_min'] - margin_x
+        x_max = content_bounds['x_max'] + margin_x
+        y_min = content_bounds['y_min'] - margin_y
+        y_max = content_bounds['y_max'] + margin_y
+        
+        # Background sits above all layers (after the last layer)
+        last_layer_z = len(self.layers) * self.layer_height
+        z_min = last_layer_z
+        z_max = last_layer_z + self.background_depth
+        
+        # Define the 8 vertices of the background box
+        vertices = [
+            [x_min, y_min, z_min],  # 0: bottom-left-back
+            [x_max, y_min, z_min],  # 1: bottom-right-back
+            [x_max, y_max, z_min],  # 2: bottom-right-front
+            [x_min, y_max, z_min],  # 3: bottom-left-front
+            [x_min, y_min, z_max],  # 4: top-left-back
+            [x_max, y_min, z_max],  # 5: top-right-back
+            [x_max, y_max, z_max],  # 6: top-right-front
+            [x_min, y_max, z_max],  # 7: top-left-front
+        ]
+        
+        triangles = []
+        
+        # Bottom face (z = z_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[1], vertices[2]]),
+            np.array([vertices[0], vertices[2], vertices[3]])
+        ])
+        
+        # Top face (z = z_max) - this connects to the simulation
+        triangles.extend([
+            np.array([vertices[4], vertices[6], vertices[5]]),
+            np.array([vertices[4], vertices[7], vertices[6]])
+        ])
+        
+        # Front face (y = y_max)
+        triangles.extend([
+            np.array([vertices[3], vertices[2], vertices[6]]),
+            np.array([vertices[3], vertices[6], vertices[7]])
+        ])
+        
+        # Back face (y = y_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[4], vertices[5]]),
+            np.array([vertices[0], vertices[5], vertices[1]])
+        ])
+        
+        # Right face (x = x_max)
+        triangles.extend([
+            np.array([vertices[1], vertices[5], vertices[6]]),
+            np.array([vertices[1], vertices[6], vertices[2]])
+        ])
+        
+        # Left face (x = x_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[3], vertices[7]]),
+            np.array([vertices[0], vertices[7], vertices[4]])
+        ])
+        
+        return triangles
+    
+    def _create_border_mesh(self) -> List[np.ndarray]:
+        """Create triangular faces for the border walls around the background.
+        
+        Returns:
+            List of triangular faces as numpy arrays
+        """
+        if not self.background or not self.background_border or not self.layers:
+            return []
+        
+        # Calculate bounds based on actual simulation content
+        content_bounds = self._get_simulation_content_bounds()
+        
+        # Apply margin to content bounds
+        content_width = content_bounds['x_max'] - content_bounds['x_min']
+        content_height = content_bounds['y_max'] - content_bounds['y_min']
+        margin_x = content_width * self.background_margin
+        margin_y = content_height * self.background_margin
+        
+        # Background outer bounds match content aspect ratio
+        x_min = content_bounds['x_min'] - margin_x
+        x_max = content_bounds['x_max'] + margin_x
+        y_min = content_bounds['y_min'] - margin_y
+        y_max = content_bounds['y_max'] + margin_y
+        
+        # Background sits above all layers
+        last_layer_z = len(self.layers) * self.layer_height
+        background_bottom = last_layer_z
+        background_top = last_layer_z + self.background_depth
+        border_bottom = background_bottom - self.border_height
+        
+        triangles = []
+        
+        # Create four border walls around the background
+        # Each wall is a rectangular prism
+        
+        # Front wall (y = y_max side) - inset from edge by border_thickness
+        triangles.extend(self._create_border_wall(
+            x_min, x_max, y_max - self.border_thickness, y_max,
+            border_bottom, background_bottom
+        ))
+        
+        # Back wall (y = y_min side) - inset from edge by border_thickness
+        triangles.extend(self._create_border_wall(
+            x_min, x_max, y_min, y_min + self.border_thickness,
+            border_bottom, background_bottom
+        ))
+        
+        # Right wall (x = x_max side) - inset from edge by border_thickness
+        triangles.extend(self._create_border_wall(
+            x_max - self.border_thickness, x_max, y_min + self.border_thickness, y_max - self.border_thickness,
+            border_bottom, background_bottom
+        ))
+        
+        # Left wall (x = x_min side) - inset from edge by border_thickness
+        triangles.extend(self._create_border_wall(
+            x_min, x_min + self.border_thickness, y_min + self.border_thickness, y_max - self.border_thickness,
+            border_bottom, background_bottom
+        ))
+        
+        return triangles
+    
+    def _create_border_wall(self, x_min: float, x_max: float, y_min: float, y_max: float,
+                           z_min: float, z_max: float) -> List[np.ndarray]:
+        """Create triangular faces for a single border wall.
+        
+        Args:
+            x_min, x_max: X bounds of the wall
+            y_min, y_max: Y bounds of the wall
+            z_min, z_max: Z bounds of the wall
+            
+        Returns:
+            List of triangular faces as numpy arrays
+        """
+        # Define the 8 vertices of the wall box
+        vertices = [
+            [x_min, y_min, z_min],  # 0: bottom-left-back
+            [x_max, y_min, z_min],  # 1: bottom-right-back
+            [x_max, y_max, z_min],  # 2: bottom-right-front
+            [x_min, y_max, z_min],  # 3: bottom-left-front
+            [x_min, y_min, z_max],  # 4: top-left-back
+            [x_max, y_min, z_max],  # 5: top-right-back
+            [x_max, y_max, z_max],  # 6: top-right-front
+            [x_min, y_max, z_max],  # 7: top-left-front
+        ]
+        
+        triangles = []
+        
+        # Bottom face (z = z_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[1], vertices[2]]),
+            np.array([vertices[0], vertices[2], vertices[3]])
+        ])
+        
+        # Top face (z = z_max) - connected to background
+        triangles.extend([
+            np.array([vertices[4], vertices[6], vertices[5]]),
+            np.array([vertices[4], vertices[7], vertices[6]])
+        ])
+        
+        # Front face (y = y_max)
+        triangles.extend([
+            np.array([vertices[3], vertices[2], vertices[6]]),
+            np.array([vertices[3], vertices[6], vertices[7]])
+        ])
+        
+        # Back face (y = y_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[4], vertices[5]]),
+            np.array([vertices[0], vertices[5], vertices[1]])
+        ])
+        
+        # Right face (x = x_max)
+        triangles.extend([
+            np.array([vertices[1], vertices[5], vertices[6]]),
+            np.array([vertices[1], vertices[6], vertices[2]])
+        ])
+        
+        # Left face (x = x_min)
+        triangles.extend([
+            np.array([vertices[0], vertices[3], vertices[7]]),
+            np.array([vertices[0], vertices[7], vertices[4]])
+        ])
+        
+        return triangles
+    
+    def _get_simulation_content_bounds(self) -> dict:
+        """Get the bounding box of actual simulation content from the last layer.
+        
+        Returns:
+            Dictionary with x_min, x_max, y_min, y_max bounds of active content
+        """
+        if not self.layers:
+            # Fallback to full grid if no layers
+            return {
+                'x_min': 0,
+                'x_max': self.simulation.grid.width,
+                'y_min': 0,
+                'y_max': self.simulation.grid.height
+            }
+        
+        # Use the last layer to determine content bounds
+        last_layer = self.layers[-1]
+        
+        # Find all positions with active content
+        active_positions = np.where(last_layer)
+        
+        if len(active_positions[0]) == 0:
+            # No active content, fallback to full grid
+            return {
+                'x_min': 0,
+                'x_max': self.simulation.grid.width,
+                'y_min': 0,
+                'y_max': self.simulation.grid.height
+            }
+        
+        # Get bounds of active content
+        y_positions = active_positions[0]  # Row indices
+        x_positions = active_positions[1]  # Column indices
+        
+        # Convert to actual coordinates (add 1 to max for inclusive bound)
+        return {
+            'x_min': float(np.min(x_positions)),
+            'x_max': float(np.max(x_positions) + 1),
+            'y_min': float(np.min(y_positions)),
+            'y_max': float(np.max(y_positions) + 1)
+        }
     
     def validate_connectivity(self) -> bool:
         """Validate that the 3D model has proper connectivity.
