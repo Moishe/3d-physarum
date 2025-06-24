@@ -17,14 +17,14 @@ def create_argument_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s --steps 200 --actors 100 --output my_model.stl
-  %(prog)s --width 150 --height 150 --decay 0.02 --threshold 0.15
-  %(prog)s --view-radius 5 --view-distance 15 --speed 1.5
-  %(prog)s --diffusion-rate 0.1 --decay 0.005 --steps 300
-  %(prog)s --smooth --smoothing-iterations 3 --output smooth_model.stl
-  %(prog)s --smooth --smoothing-type taubin --taubin-lambda 0.6 --mesh-quality
-  %(prog)s --smooth --smoothing-type feature_preserving --preserve-features --feature-angle 45
-  %(prog)s --smooth --smoothing-type boundary_outline --output outline_model.stl
+  python main.py --steps 200 --actors 100 --output my_model.stl
+  python main.py --width 150 --height 150 --decay 0.02 --threshold 0.15
+  python main.py --view-radius 5 --view-distance 15 --speed 1.5
+  python main.py --diffusion-rate 0.1 --decay 0.005 --steps 300
+  python main.py --smooth --smoothing-iterations 3 --output smooth_model.stl
+  python main.py --smooth --smoothing-type taubin --taubin-lambda 0.6 --mesh-quality
+  python main.py --smooth --smoothing-type feature_preserving --preserve-features --feature-angle 45
+  python main.py --smooth --smoothing-type boundary_outline --output outline_model.stl
         """
     )
     
@@ -89,7 +89,7 @@ Examples:
     model_group.add_argument('--background-depth', type=float, default=2.0, metavar='F',
                             help='Depth/thickness of the background layer (default: 2.0)')
     model_group.add_argument('--background-margin', type=float, default=0.05, metavar='F',
-                            help='Background margin as fraction of simulation bounds (default: 0.05 = 5%)')
+                            help='Background margin as fraction of simulation bounds (default: 0.05 = 5%%)')
     model_group.add_argument('--background-border', action='store_true',
                             help='Add a raised border around the background edges')
     model_group.add_argument('--border-height', type=float, default=1.0, metavar='F',
