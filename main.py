@@ -7,6 +7,7 @@ import os
 from physarum import PhysarumSimulation
 from model_3d import Model3DGenerator
 from model_3d_smooth import SmoothModel3DGenerator
+from output_manager import OutputManager
 import numpy as np
 
 
@@ -195,6 +196,12 @@ def validate_parameters(args):
 def run_simulation_with_3d_generation(args):
     """Run the Physarum simulation and generate 3D model."""
     
+    # Initialize output manager
+    output_manager = OutputManager()
+    
+    # Prepare output files with unique names and create sidecar JSON
+    final_stl_path, final_json_path = output_manager.prepare_output_files(args.output, args)
+    
     # If using an image but no dimensions specified, get dimensions from image
     if args.image and args.width == 100 and args.height == 100:
         # Check if these are still the default values
@@ -232,7 +239,8 @@ def run_simulation_with_3d_generation(args):
             if args.smoothing_type == 'feature_preserving' or args.preserve_features:
                 print(f"Preserve features: {args.preserve_features}")
                 print(f"Feature angle: {args.feature_angle}°")
-        print(f"Output file: {args.output}")
+        print(f"Output file: {final_stl_path}")
+        print(f"Sidecar JSON: {final_json_path}")
         print()
     
     # Create simulation
@@ -318,15 +326,16 @@ def run_simulation_with_3d_generation(args):
     
     # Generate and save STL file
     if not args.quiet:
-        print(f"Generating STL file: {args.output}")
+        print(f"Generating STL file: {final_stl_path}")
     
     try:
-        generator.save_stl(args.output)
+        generator.save_stl(final_stl_path)
         if not args.quiet:
-            print(f"✓ STL file saved successfully: {args.output}")
+            print(f"✓ STL file saved successfully: {final_stl_path}")
+            print(f"✓ Sidecar JSON saved: {final_json_path}")
             
             # File size information
-            file_size = os.path.getsize(args.output)
+            file_size = os.path.getsize(final_stl_path)
             if file_size > 1024 * 1024:
                 size_str = f"{file_size / (1024 * 1024):.1f} MB"
             elif file_size > 1024:
