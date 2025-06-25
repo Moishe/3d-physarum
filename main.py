@@ -48,6 +48,12 @@ Examples:
                           help='Actor sensing distance (default: 10)')
     sim_group.add_argument('--speed', type=float, default=1.0, metavar='F',
                           help='Actor movement speed (default: 1.0)')
+    sim_group.add_argument('--speed-min', type=float, metavar='F',
+                          help='Minimum speed for initial actors (defaults to --speed)')
+    sim_group.add_argument('--speed-max', type=float, metavar='F',
+                          help='Maximum speed for initial actors (defaults to --speed)')
+    sim_group.add_argument('--spawn-speed-randomization', type=float, default=0.2, metavar='F',
+                          help='Factor for randomizing spawned actor speeds, 0.0-1.0 (default: 0.2)')
     sim_group.add_argument('--initial-diameter', type=float, default=20.0, metavar='F',
                           help='Initial circle diameter for actor placement (default: 20.0)')
     sim_group.add_argument('--death-probability', type=float, default=0.001, metavar='F',
@@ -144,6 +150,14 @@ def validate_parameters(args):
         errors.append("View distance must be non-negative")
     if args.speed < 0:
         errors.append("Speed must be non-negative")
+    if args.speed_min is not None and args.speed_min <= 0:
+        errors.append("Speed minimum must be positive")
+    if args.speed_max is not None and args.speed_max <= 0:
+        errors.append("Speed maximum must be positive")
+    if args.speed_min is not None and args.speed_max is not None and args.speed_min > args.speed_max:
+        errors.append("Speed minimum must be less than or equal to speed maximum")
+    if args.spawn_speed_randomization < 0 or args.spawn_speed_randomization > 1:
+        errors.append("Spawn speed randomization must be between 0.0 and 1.0")
     
     # 3D model parameters
     if args.layer_height <= 0:
@@ -227,7 +241,11 @@ def run_simulation_with_3d_generation(args):
         print(f"Diffusion rate: {args.diffusion_rate}")
         print(f"View radius: {args.view_radius}")
         print(f"View distance: {args.view_distance}")
-        print(f"Speed: {args.speed}")
+        if args.speed_min is not None or args.speed_max is not None:
+            print(f"Speed range: {args.speed_min or args.speed} - {args.speed_max or args.speed}")
+        else:
+            print(f"Speed: {args.speed}")
+        print(f"Spawn speed randomization: {args.spawn_speed_randomization}")
         print(f"Model type: {'Smooth (Marching Cubes)' if args.smooth else 'Voxel-based'}")
         print(f"Layer height: {args.layer_height}")
         print(f"Threshold: {args.threshold}")
@@ -259,7 +277,10 @@ def run_simulation_with_3d_generation(args):
         spawn_probability=args.spawn_probability,
         diffusion_rate=args.diffusion_rate,
         direction_deviation=args.direction_deviation,
-        image_path=args.image
+        image_path=args.image,
+        speed_min=args.speed_min,
+        speed_max=args.speed_max,
+        spawn_speed_randomization=args.spawn_speed_randomization
     )
     
     # Create 3D model generator (smooth or voxel-based)
