@@ -39,14 +39,14 @@ class OutputManager:
         
         return output_path
     
-    def get_unique_filename(self, base_path: str) -> Tuple[str, str]:
+    def get_unique_filename(self, base_path: str) -> Tuple[str, str, str]:
         """Get a unique filename by adding sequential numbers if needed.
         
         Args:
             base_path: The base path for the file
             
         Returns:
-            Tuple of (unique_stl_path, unique_json_path)
+            Tuple of (unique_stl_path, unique_json_path, unique_jpg_path)
         """
         # Ensure output directory exists
         base_path = self.ensure_output_directory(base_path)
@@ -58,14 +58,16 @@ class OutputManager:
         # Check if base filename exists
         stl_path = base_path
         json_path = path_without_ext + ".json"
+        jpg_path = path_without_ext + ".jpg"
         
         counter = 1
-        while os.path.exists(stl_path) or os.path.exists(json_path):
+        while os.path.exists(stl_path) or os.path.exists(json_path) or os.path.exists(jpg_path):
             stl_path = f"{path_without_ext}-{counter}{ext}"
             json_path = f"{path_without_ext}-{counter}.json"
+            jpg_path = f"{path_without_ext}-{counter}.jpg"
             counter += 1
         
-        return stl_path, json_path
+        return stl_path, json_path, jpg_path
     
     def create_sidecar_json(self, json_path: str, args: Any, command_line: str) -> None:
         """Create a sidecar JSON file with parameters and command line.
@@ -91,7 +93,7 @@ class OutputManager:
         with open(json_path, 'w') as f:
             json.dump(sidecar_data, f, indent=2)
     
-    def prepare_output_files(self, output_path: str, args: Any) -> Tuple[str, str]:
+    def prepare_output_files(self, output_path: str, args: Any) -> Tuple[str, str, str]:
         """Prepare output files with unique names and create sidecar JSON.
         
         Args:
@@ -99,10 +101,10 @@ class OutputManager:
             args: The parsed arguments object
             
         Returns:
-            Tuple of (final_stl_path, final_json_path)
+            Tuple of (final_stl_path, final_json_path, final_jpg_path)
         """
         # Get unique filenames
-        stl_path, json_path = self.get_unique_filename(output_path)
+        stl_path, json_path, jpg_path = self.get_unique_filename(output_path)
         
         # Reconstruct the command line from sys.argv
         command_line = " ".join(sys.argv)
@@ -110,4 +112,4 @@ class OutputManager:
         # Create sidecar JSON
         self.create_sidecar_json(json_path, args, command_line)
         
-        return stl_path, json_path
+        return stl_path, json_path, jpg_path
