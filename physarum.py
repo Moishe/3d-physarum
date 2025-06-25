@@ -108,7 +108,7 @@ class PhysarumGrid:
 class PhysarumActor:
     """Individual Physarum agent that moves, senses, and deposits trails."""
     
-    def __init__(self, x: float, y: float, angle: float, view_radius: int, view_distance: int):
+    def __init__(self, x: float, y: float, angle: float, view_radius: int, view_distance: int, speed: float = 1.0):
         """Initialize a Physarum actor.
         
         Args:
@@ -117,24 +117,27 @@ class PhysarumActor:
             angle: Starting direction in radians
             view_radius: Radius of sensing area
             view_distance: Distance ahead for sensing
+            speed: Individual movement speed for this actor
         """
         self.x = x
         self.y = y
         self.angle = angle
         self.view_radius = view_radius
         self.view_distance = view_distance
+        self.speed = speed  # Individual speed for this actor
         self.turn_speed = 0.1  # How fast the actor can turn
         self.trail_deposit_amount = 1.0  # Amount of trail deposited per step
         self.age = 0  # Age in simulation steps
     
-    def move(self, speed: float) -> None:
+    def move(self, speed: float = None) -> None:
         """Move the actor forward based on its current angle.
         
         Args:
-            speed: Movement speed
+            speed: Movement speed (uses actor's individual speed if None)
         """
-        self.x += math.cos(self.angle) * speed
-        self.y += math.sin(self.angle) * speed
+        actual_speed = speed if speed is not None else self.speed
+        self.x += math.cos(self.angle) * actual_speed
+        self.y += math.sin(self.angle) * actual_speed
     
     def sense_environment(self, grid: PhysarumGrid) -> Tuple[float, float, float]:
         """Sense trail strength in three directions: left, center, right.
@@ -257,7 +260,9 @@ class PhysarumSimulation:
                  view_radius: int = 3, view_distance: int = 10, speed: float = 1.0,
                  initial_diameter: float = 20.0, death_probability: float = 0.001,
                  spawn_probability: float = 0.005, diffusion_rate: float = 0.0,
-                 direction_deviation: float = 1.57, image_path: Optional[str] = None):
+                 direction_deviation: float = 1.57, image_path: Optional[str] = None,
+                 speed_min: float = None, speed_max: float = None, 
+                 spawn_speed_randomization: float = 0.2):
         """Initialize the Physarum simulation.
         
         Args:
@@ -267,13 +272,16 @@ class PhysarumSimulation:
             decay_rate: Trail decay rate (0.0 to 1.0)
             view_radius: Sensor radius for actors
             view_distance: Sensor distance for actors
-            speed: Movement speed for actors
+            speed: Movement speed for actors (used as base or when min/max not specified)
             initial_diameter: Diameter of initial circular actor placement
             death_probability: Base probability of actor death per step
             spawn_probability: Probability of spawning new actors per step
             diffusion_rate: Rate of pheromone diffusion (0.0 to 1.0)
             direction_deviation: Maximum direction deviation for spawned actors in radians
             image_path: Path to JPEG image for initial actor placement (overrides num_actors)
+            speed_min: Minimum speed for initial actors (defaults to speed if None)
+            speed_max: Maximum speed for initial actors (defaults to speed if None)
+            spawn_speed_randomization: Factor for randomizing spawned actor speeds (0.0 to 1.0)
         """
         # Validate parameters
         if width <= 0 or height <= 0:
@@ -287,10 +295,21 @@ class PhysarumSimulation:
         if direction_deviation < 0 or direction_deviation > 3.14159:
             raise ValueError("Direction deviation must be between 0 and π radians")
         
+        # Set speed defaults and validate
+        self.speed_min = speed_min if speed_min is not None else speed
+        self.speed_max = speed_max if speed_max is not None else speed
+        if self.speed_min > self.speed_max:
+            raise ValueError("speed_min must be less than or equal to speed_max")
+        if self.speed_min <= 0 or self.speed_max <= 0:
+            raise ValueError("Speed values must be positive")
+        if spawn_speed_randomization < 0 or spawn_speed_randomization > 1:
+            raise ValueError("spawn_speed_randomization must be between 0 and 1")
+        
         self.grid = PhysarumGrid(width, height)
         self.decay_rate = decay_rate
         self.diffusion_rate = diffusion_rate
         self.speed = speed
+        self.spawn_speed_randomization = spawn_speed_randomization
         self.death_probability = death_probability
         self.spawn_probability = spawn_probability
         self.direction_deviation = direction_deviation
@@ -302,6 +321,7 @@ class PhysarumSimulation:
         self.actor_positions = None  # Shape: (N, 2) - x, y coordinates
         self.actor_angles = None     # Shape: (N,) - angle in radians
         self.actor_ages = None       # Shape: (N,) - age in steps
+        self.actor_speeds = None     # Shape: (N,) - individual actor speeds
         self.num_actors = 0
         
         # Create sampling kernels for sensing
@@ -330,6 +350,10 @@ class PhysarumSimulation:
         if kernel_sum > 0:
             self.sensing_kernel /= kernel_sum
     
+    def _generate_random_speed(self) -> float:
+        """Generate a random speed between speed_min and speed_max."""
+        return random.uniform(self.speed_min, self.speed_max)
+    
     def _vectorize_actors(self) -> None:
         """Convert individual actors to vectorized numpy arrays."""
         if not self.actors:
@@ -337,12 +361,14 @@ class PhysarumSimulation:
             self.actor_positions = np.empty((0, 2), dtype=np.float32)
             self.actor_angles = np.empty(0, dtype=np.float32)
             self.actor_ages = np.empty(0, dtype=np.int32)
+            self.actor_speeds = np.empty(0, dtype=np.float32)
             return
             
         self.num_actors = len(self.actors)
         self.actor_positions = np.array([[actor.x, actor.y] for actor in self.actors], dtype=np.float32)
         self.actor_angles = np.array([actor.angle for actor in self.actors], dtype=np.float32)
         self.actor_ages = np.array([actor.age for actor in self.actors], dtype=np.int32)
+        self.actor_speeds = np.array([actor.speed for actor in self.actors], dtype=np.float32)
     
     def _sync_actors_from_arrays(self) -> None:
         """Sync individual actor objects from vectorized arrays for backward compatibility."""
@@ -353,6 +379,7 @@ class PhysarumSimulation:
                 actor.y = float(self.actor_positions[i, 1])
                 actor.angle = float(self.actor_angles[i])
                 actor.age = int(self.actor_ages[i])
+                actor.speed = float(self.actor_speeds[i])
         
         # Handle case where vectorized arrays have more actors (from spawning)
         while len(self.actors) < self.num_actors:
@@ -362,7 +389,8 @@ class PhysarumSimulation:
                 float(self.actor_positions[idx, 1]),
                 float(self.actor_angles[idx]),
                 self.view_radius,
-                self.view_distance
+                self.view_distance,
+                float(self.actor_speeds[idx])
             )
             new_actor.age = int(self.actor_ages[idx])
             self.actors.append(new_actor)
@@ -393,9 +421,10 @@ class PhysarumSimulation:
             x = center_x + radius * math.cos(angle)
             y = center_y + radius * math.sin(angle)
             
-            # Random orientation
+            # Random orientation and speed
             actor_angle = random.uniform(0, 2 * math.pi)
-            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance)
+            actor_speed = self._generate_random_speed()
+            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance, actor_speed)
             self.actors.append(actor)
         
         # If we need more actors than fit on the circle, place them randomly within the circle
@@ -406,9 +435,10 @@ class PhysarumSimulation:
             x = center_x + r * math.cos(theta)
             y = center_y + r * math.sin(theta)
             
-            # Random orientation
+            # Random orientation and speed
             actor_angle = random.uniform(0, 2 * math.pi)
-            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance)
+            actor_speed = self._generate_random_speed()
+            actor = PhysarumActor(x, y, actor_angle, self.view_radius, self.view_distance, actor_speed)
             self.actors.append(actor)
     
     def _create_actors_from_image(self, image_path: str, width: int, height: int) -> None:
@@ -457,9 +487,10 @@ class PhysarumSimulation:
                 # Flip Y-coordinate to convert from image space (top-left origin) to simulation space (bottom-left origin)
                 actor_y = float((cropped_img.shape[0] - 1 - y) + offset_y)
                 
-                # Random orientation for each actor
+                # Random orientation and speed for each actor
                 actor_angle = random.uniform(0, 2 * math.pi)
-                actor = PhysarumActor(actor_x, actor_y, actor_angle, self.view_radius, self.view_distance)
+                actor_speed = self._generate_random_speed()
+                actor = PhysarumActor(actor_x, actor_y, actor_angle, self.view_radius, self.view_distance, actor_speed)
                 self.actors.append(actor)
                 
         except Exception as e:
@@ -547,9 +578,9 @@ class PhysarumSimulation:
         if self.num_actors == 0:
             return
             
-        # Vectorized movement
-        self.actor_positions[:, 0] += np.cos(self.actor_angles) * self.speed
-        self.actor_positions[:, 1] += np.sin(self.actor_angles) * self.speed
+        # Vectorized movement using individual speeds
+        self.actor_positions[:, 0] += np.cos(self.actor_angles) * self.actor_speeds
+        self.actor_positions[:, 1] += np.sin(self.actor_angles) * self.actor_speeds
     
     def _wrap_positions(self) -> None:
         """Wrap actor positions around grid boundaries."""
@@ -593,6 +624,7 @@ class PhysarumSimulation:
             self.actor_positions = self.actor_positions[survival_mask]
             self.actor_angles = self.actor_angles[survival_mask]
             self.actor_ages = self.actor_ages[survival_mask]
+            self.actor_speeds = self.actor_speeds[survival_mask]
             self.num_actors = np.sum(survival_mask)
         else:
             # All actors died
@@ -600,6 +632,7 @@ class PhysarumSimulation:
             self.actor_positions = np.empty((0, 2), dtype=np.float32)
             self.actor_angles = np.empty(0, dtype=np.float32)
             self.actor_ages = np.empty(0, dtype=np.int32)
+            self.actor_speeds = np.empty(0, dtype=np.float32)
         
         # Sync individual actors from vectorized arrays
         self._sync_actors_from_arrays()
@@ -622,9 +655,10 @@ class PhysarumSimulation:
         if num_spawns == 0:
             return
             
-        # Get parent positions and angles
+        # Get parent positions, angles, and speeds
         parent_positions = self.actor_positions[spawn_mask]
         parent_angles = self.actor_angles[spawn_mask]
+        parent_speeds = self.actor_speeds[spawn_mask]
         
         # Generate spawn positions
         spawn_distance = 5.0
@@ -644,6 +678,21 @@ class PhysarumSimulation:
             deviations = np.zeros(num_spawns)
         new_angles = parent_angles + deviations
         
+        # Speed inheritance with randomization
+        if self.spawn_speed_randomization > 0:
+            # Apply randomization as a percentage of parent speed
+            speed_variations = np.random.uniform(
+                -self.spawn_speed_randomization, 
+                self.spawn_speed_randomization, 
+                num_spawns
+            )
+            new_speeds = parent_speeds * (1.0 + speed_variations)
+            # Ensure speeds stay positive
+            new_speeds = np.maximum(new_speeds, 0.1)
+        else:
+            # No randomization, inherit parent speed exactly
+            new_speeds = parent_speeds.copy()
+        
         # Add new actors to arrays
         if num_spawns > 0:
             new_positions = np.column_stack([new_x, new_y])
@@ -652,6 +701,7 @@ class PhysarumSimulation:
             self.actor_positions = np.vstack([self.actor_positions, new_positions])
             self.actor_angles = np.concatenate([self.actor_angles, new_angles])
             self.actor_ages = np.concatenate([self.actor_ages, new_ages])
+            self.actor_speeds = np.concatenate([self.actor_speeds, new_speeds])
             self.num_actors += num_spawns
             
             # Sync individual actors from vectorized arrays

@@ -189,6 +189,35 @@ class TestPhysarumActor:
         # Stronger signal on the right should turn right
         actor.steer(0.0, 0.0, 1.0)  # right > center > left
         assert actor.angle != 0.0
+    
+    def test_actor_speed_initialization(self):
+        """Test that actor initializes with correct speed."""
+        actor = PhysarumActor(0.0, 0.0, 0.0, 5, 10, speed=2.5)
+        assert actor.speed == 2.5
+        
+        # Test default speed
+        actor_default = PhysarumActor(0.0, 0.0, 0.0, 5, 10)
+        assert actor_default.speed == 1.0
+    
+    def test_actor_movement_with_individual_speed(self):
+        """Test actor movement using individual speed."""
+        actor = PhysarumActor(0.0, 0.0, 0.0, 5, 10, speed=2.0)  # Facing right
+        
+        initial_x = actor.x
+        actor.move()  # Should use actor's individual speed
+        
+        # Should move right by 2.0 units (actor's speed)
+        assert abs(actor.x - initial_x - 2.0) < 1e-6
+    
+    def test_actor_movement_with_override_speed(self):
+        """Test actor movement with override speed parameter."""
+        actor = PhysarumActor(0.0, 0.0, 0.0, 5, 10, speed=2.0)  # Facing right
+        
+        initial_x = actor.x
+        actor.move(speed=3.0)  # Override with different speed
+        
+        # Should move right by 3.0 units (override speed)
+        assert abs(actor.x - initial_x - 3.0) < 1e-6
 
 
 class TestPhysarumSimulation:
@@ -275,6 +304,88 @@ class TestPhysarumSimulation:
         simulation = PhysarumSimulation(50, 50, 5, 0.01)
         
         assert simulation.diffusion_rate == 0.0
+    
+    def test_speed_randomization_initialization(self):
+        """Test that simulation initializes with speed randomization parameters."""
+        simulation = PhysarumSimulation(
+            50, 50, 5, 0.01, 
+            speed_min=0.5, speed_max=2.0, spawn_speed_randomization=0.3
+        )
+        
+        assert simulation.speed_min == 0.5
+        assert simulation.speed_max == 2.0
+        assert simulation.spawn_speed_randomization == 0.3
+    
+    def test_speed_randomization_defaults(self):
+        """Test speed randomization parameter defaults."""
+        simulation = PhysarumSimulation(50, 50, 5, 0.01, speed=1.5)
+        
+        # Should default to base speed when min/max not specified
+        assert simulation.speed_min == 1.5
+        assert simulation.speed_max == 1.5
+        assert simulation.spawn_speed_randomization == 0.2  # Default value
+    
+    def test_speed_randomization_validation(self):
+        """Test validation of speed randomization parameters."""
+        # Test invalid speed_min > speed_max
+        with pytest.raises(ValueError):
+            PhysarumSimulation(50, 50, 5, 0.01, speed_min=2.0, speed_max=1.0)
+        
+        # Test invalid negative speeds
+        with pytest.raises(ValueError):
+            PhysarumSimulation(50, 50, 5, 0.01, speed_min=-1.0)
+        
+        with pytest.raises(ValueError):
+            PhysarumSimulation(50, 50, 5, 0.01, speed_max=-1.0)
+        
+        # Test invalid spawn_speed_randomization
+        with pytest.raises(ValueError):
+            PhysarumSimulation(50, 50, 5, 0.01, spawn_speed_randomization=-0.1)
+        
+        with pytest.raises(ValueError):
+            PhysarumSimulation(50, 50, 5, 0.01, spawn_speed_randomization=1.1)
+    
+    def test_actors_have_randomized_speeds(self):
+        """Test that actors are created with randomized speeds."""
+        simulation = PhysarumSimulation(
+            50, 50, 10, 0.01, 
+            speed_min=0.5, speed_max=2.0
+        )
+        
+        # All actors should have speeds between min and max
+        for actor in simulation.actors:
+            assert 0.5 <= actor.speed <= 2.0
+        
+        # Verify vectorized speeds match individual actor speeds
+        assert len(simulation.actor_speeds) == len(simulation.actors)
+        for i, actor in enumerate(simulation.actors):
+            assert abs(simulation.actor_speeds[i] - actor.speed) < 1e-6
+    
+    def test_spawn_speed_inheritance(self):
+        """Test that spawned actors inherit and randomize parent speeds."""
+        # Create simulation with known speed range and high spawn probability
+        simulation = PhysarumSimulation(
+            50, 50, 2, 0.01,
+            speed_min=1.0, speed_max=1.0,  # All start with speed 1.0
+            spawn_probability=1.0,  # Guarantee spawning
+            spawn_speed_randomization=0.5  # 50% randomization
+        )
+        
+        initial_count = simulation.num_actors
+        
+        # Run one step to trigger spawning
+        simulation.step()
+        
+        # Should have more actors now
+        assert simulation.num_actors > initial_count
+        
+        # New actors should have speeds near 1.0 but with some variation
+        new_actor_speeds = simulation.actor_speeds[initial_count:]
+        for speed in new_actor_speeds:
+            # Speed should be in range [0.5, 1.5] due to 50% randomization
+            # and minimum speed clamping at 0.1
+            assert speed >= 0.1  # Minimum enforced
+            assert speed <= 1.5  # Maximum with 50% increase
 
 
 if __name__ == "__main__":
