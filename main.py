@@ -8,6 +8,7 @@ from physarum import PhysarumSimulation
 from model_3d import Model3DGenerator
 from model_3d_smooth import SmoothModel3DGenerator
 from output_manager import OutputManager
+from preview_generator import PreviewGenerator
 import numpy as np
 
 
@@ -200,7 +201,7 @@ def run_simulation_with_3d_generation(args):
     output_manager = OutputManager()
     
     # Prepare output files with unique names and create sidecar JSON
-    final_stl_path, final_json_path = output_manager.prepare_output_files(args.output, args)
+    final_stl_path, final_json_path, final_jpg_path = output_manager.prepare_output_files(args.output, args)
     
     # If using an image but no dimensions specified, get dimensions from image
     if args.image and args.width == 100 and args.height == 100:
@@ -241,6 +242,7 @@ def run_simulation_with_3d_generation(args):
                 print(f"Feature angle: {args.feature_angle}°")
         print(f"Output file: {final_stl_path}")
         print(f"Sidecar JSON: {final_json_path}")
+        print(f"Preview image: {final_jpg_path}")
         print()
     
     # Create simulation
@@ -324,6 +326,24 @@ def run_simulation_with_3d_generation(args):
     if not generator.validate_connectivity():
         print("Warning: 3D model may have connectivity issues", file=sys.stderr)
     
+    # Generate preview image
+    if not args.quiet:
+        print(f"Generating preview image: {final_jpg_path}")
+    
+    try:
+        preview_generator = PreviewGenerator(width=800, height=800)
+        preview_title = f"Physarum 3D Model - {args.steps} steps"
+        preview_generator.generate_preview_from_simulation(
+            simulation, 
+            final_jpg_path, 
+            threshold=args.threshold,
+            title=preview_title
+        )
+        if not args.quiet:
+            print(f"✓ Preview image saved: {final_jpg_path}")
+    except Exception as e:
+        print(f"Warning: Could not generate preview image: {e}", file=sys.stderr)
+    
     # Generate and save STL file
     if not args.quiet:
         print(f"Generating STL file: {final_stl_path}")
@@ -333,6 +353,7 @@ def run_simulation_with_3d_generation(args):
         if not args.quiet:
             print(f"✓ STL file saved successfully: {final_stl_path}")
             print(f"✓ Sidecar JSON saved: {final_json_path}")
+            print(f"✓ Preview image saved: {final_jpg_path}")
             
             # File size information
             file_size = os.path.getsize(final_stl_path)

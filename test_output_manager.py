@@ -51,33 +51,41 @@ class TestOutputManager(unittest.TestCase):
         base_path = os.path.join(self.test_dir, "test.stl")
         
         # Create first file
-        stl_path1, json_path1 = self.output_manager.get_unique_filename(base_path)
+        stl_path1, json_path1, jpg_path1 = self.output_manager.get_unique_filename(base_path)
         with open(stl_path1, 'w') as f:
             f.write("test")
         with open(json_path1, 'w') as f:
             f.write("{}")
+        with open(jpg_path1, 'w') as f:
+            f.write("fake jpg")
         
         # Create second file - should be numbered
-        stl_path2, json_path2 = self.output_manager.get_unique_filename(base_path)
+        stl_path2, json_path2, jpg_path2 = self.output_manager.get_unique_filename(base_path)
         expected_stl2 = os.path.join(self.test_dir, "test-1.stl")
         expected_json2 = os.path.join(self.test_dir, "test-1.json")
+        expected_jpg2 = os.path.join(self.test_dir, "test-1.jpg")
         
         self.assertEqual(stl_path2, expected_stl2)
         self.assertEqual(json_path2, expected_json2)
+        self.assertEqual(jpg_path2, expected_jpg2)
         
         # Create the numbered files
         with open(stl_path2, 'w') as f:
             f.write("test")
         with open(json_path2, 'w') as f:
             f.write("{}")
+        with open(jpg_path2, 'w') as f:
+            f.write("fake jpg")
         
         # Create third file - should be numbered -2
-        stl_path3, json_path3 = self.output_manager.get_unique_filename(base_path)
+        stl_path3, json_path3, jpg_path3 = self.output_manager.get_unique_filename(base_path)
         expected_stl3 = os.path.join(self.test_dir, "test-2.stl")
         expected_json3 = os.path.join(self.test_dir, "test-2.json")
+        expected_jpg3 = os.path.join(self.test_dir, "test-2.jpg")
         
         self.assertEqual(stl_path3, expected_stl3)
         self.assertEqual(json_path3, expected_json3)
+        self.assertEqual(jpg_path3, expected_jpg3)
     
     def test_sidecar_json_creation(self):
         """Test creation of sidecar JSON files."""
@@ -140,12 +148,14 @@ class TestOutputManager(unittest.TestCase):
             f.write("{}")
         
         # Should still create numbered files
-        stl_path, json_path_result = self.output_manager.get_unique_filename(base_path)
+        stl_path, json_path_result, jpg_path_result = self.output_manager.get_unique_filename(base_path)
         expected_stl = os.path.join(self.test_dir, "test-1.stl")
         expected_json = os.path.join(self.test_dir, "test-1.json")
+        expected_jpg = os.path.join(self.test_dir, "test-1.jpg")
         
         self.assertEqual(stl_path, expected_stl)
         self.assertEqual(json_path_result, expected_json)
+        self.assertEqual(jpg_path_result, expected_jpg)
     
     def test_stl_only_collision(self):
         """Test behavior when only STL file exists."""
@@ -156,12 +166,14 @@ class TestOutputManager(unittest.TestCase):
             f.write("test")
         
         # Should still create numbered files
-        stl_path, json_path = self.output_manager.get_unique_filename(base_path)
+        stl_path, json_path, jpg_path = self.output_manager.get_unique_filename(base_path)
         expected_stl = os.path.join(self.test_dir, "test-1.stl")
         expected_json = os.path.join(self.test_dir, "test-1.json")
+        expected_jpg = os.path.join(self.test_dir, "test-1.jpg")
         
         self.assertEqual(stl_path, expected_stl)
         self.assertEqual(json_path, expected_json)
+        self.assertEqual(jpg_path, expected_jpg)
 
 
 if __name__ == '__main__':
