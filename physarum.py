@@ -6,6 +6,7 @@ from typing import Tuple, List, Optional
 import random
 import math
 from PIL import Image
+from scipy.ndimage import convolve
 
 
 class PhysarumGrid:
@@ -54,34 +55,40 @@ class PhysarumGrid:
         if diffusion_rate <= 0.0:
             return
             
-        # Create a copy of the current state
+        # Use the original algorithm but with numpy operations for better performance
         original_map = self.trail_map.copy()
         
-        # For each cell, diffuse its pheromone to neighbors
-        for y in range(self.height):
-            for x in range(self.width):
-                if original_map[y, x] > 0:
-                    # Amount to diffuse from this cell
-                    to_diffuse = original_map[y, x] * diffusion_rate
-                    
-                    # Count valid neighbors
-                    valid_neighbors = []
-                    for dy in [-1, 0, 1]:
-                        for dx in [-1, 0, 1]:
-                            if dx == 0 and dy == 0:
-                                continue  # Skip center
-                            nx, ny = x + dx, y + dy
-                            if 0 <= nx < self.width and 0 <= ny < self.height:
-                                valid_neighbors.append((nx, ny))
-                    
-                    if valid_neighbors:
-                        # Distribute diffused amount equally among valid neighbors
-                        per_neighbor = to_diffuse / len(valid_neighbors)
-                        for nx, ny in valid_neighbors:
-                            self.trail_map[ny, nx] += per_neighbor
-                    
-                    # Remove diffused amount from original cell
-                    self.trail_map[y, x] -= to_diffuse
+        # Create index arrays for vectorized neighbor processing
+        y_indices, x_indices = np.nonzero(original_map > 0)
+        
+        if len(y_indices) == 0:
+            return
+            
+        # For each cell with pheromone, calculate diffusion
+        for i in range(len(y_indices)):
+            y, x = y_indices[i], x_indices[i]
+            if original_map[y, x] > 0:
+                # Amount to diffuse from this cell
+                to_diffuse = original_map[y, x] * diffusion_rate
+                
+                # Find valid neighbors
+                neighbors = []
+                for dy in [-1, 0, 1]:
+                    for dx in [-1, 0, 1]:
+                        if dx == 0 and dy == 0:
+                            continue  # Skip center
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < self.width and 0 <= ny < self.height:
+                            neighbors.append((ny, nx))
+                
+                if neighbors:
+                    # Distribute diffused amount equally among valid neighbors
+                    per_neighbor = to_diffuse / len(neighbors)
+                    for ny, nx in neighbors:
+                        self.trail_map[ny, nx] += per_neighbor
+                
+                # Remove diffused amount from original cell
+                self.trail_map[y, x] -= to_diffuse
     
     def get_trail_strength(self, x: int, y: int) -> float:
         """Get trail strength at the given coordinates.
@@ -291,11 +298,78 @@ class PhysarumSimulation:
         self.view_distance = view_distance
         self.actors = []
         
+        # Vectorized actor properties
+        self.actor_positions = None  # Shape: (N, 2) - x, y coordinates
+        self.actor_angles = None     # Shape: (N,) - angle in radians
+        self.actor_ages = None       # Shape: (N,) - age in steps
+        self.num_actors = 0
+        
+        # Create sampling kernels for sensing
+        self._create_sensing_kernels()
+        
         # Create actors based on image or circular pattern
         if image_path:
             self._create_actors_from_image(image_path, width, height)
         else:
             self._create_initial_actors(num_actors, initial_diameter, width, height)
+        
+        # Convert actors to vectorized format
+        self._vectorize_actors()
+    
+    def _create_sensing_kernels(self) -> None:
+        """Create pre-computed kernels for circular sampling."""
+        # Create circular mask for sensing
+        size = 2 * self.view_radius + 1
+        center = self.view_radius
+        y, x = np.ogrid[:size, :size]
+        mask = (x - center)**2 + (y - center)**2 <= self.view_radius**2
+        
+        # Store as normalized kernel
+        self.sensing_kernel = mask.astype(np.float32)
+        kernel_sum = np.sum(self.sensing_kernel)
+        if kernel_sum > 0:
+            self.sensing_kernel /= kernel_sum
+    
+    def _vectorize_actors(self) -> None:
+        """Convert individual actors to vectorized numpy arrays."""
+        if not self.actors:
+            self.num_actors = 0
+            self.actor_positions = np.empty((0, 2), dtype=np.float32)
+            self.actor_angles = np.empty(0, dtype=np.float32)
+            self.actor_ages = np.empty(0, dtype=np.int32)
+            return
+            
+        self.num_actors = len(self.actors)
+        self.actor_positions = np.array([[actor.x, actor.y] for actor in self.actors], dtype=np.float32)
+        self.actor_angles = np.array([actor.angle for actor in self.actors], dtype=np.float32)
+        self.actor_ages = np.array([actor.age for actor in self.actors], dtype=np.int32)
+    
+    def _sync_actors_from_arrays(self) -> None:
+        """Sync individual actor objects from vectorized arrays for backward compatibility."""
+        # Update existing actors from vectorized data
+        for i, actor in enumerate(self.actors):
+            if i < len(self.actor_positions):
+                actor.x = float(self.actor_positions[i, 0])
+                actor.y = float(self.actor_positions[i, 1])
+                actor.angle = float(self.actor_angles[i])
+                actor.age = int(self.actor_ages[i])
+        
+        # Handle case where vectorized arrays have more actors (from spawning)
+        while len(self.actors) < self.num_actors:
+            idx = len(self.actors)
+            new_actor = PhysarumActor(
+                float(self.actor_positions[idx, 0]),
+                float(self.actor_positions[idx, 1]),
+                float(self.actor_angles[idx]),
+                self.view_radius,
+                self.view_distance
+            )
+            new_actor.age = int(self.actor_ages[idx])
+            self.actors.append(new_actor)
+        
+        # Handle case where vectorized arrays have fewer actors (from deaths)
+        while len(self.actors) > self.num_actors:
+            self.actors.pop()
     
     def _create_initial_actors(self, num_actors: int, diameter: float, width: int, height: int) -> None:
         """Create initial actors arranged in a circle.
@@ -393,25 +467,17 @@ class PhysarumSimulation:
     
     def step(self) -> None:
         """Perform one simulation step."""
-        # Actor sensing and movement phase
-        for actor in self.actors:
-            # Age the actor
-            actor.age_step()
+        if self.num_actors == 0:
+            return
             
-            # Sense environment
-            left, center, right = actor.sense_environment(self.grid)
-            
-            # Steer based on sensed values
-            actor.steer(left, center, right)
-            
-            # Move actor
-            actor.move(self.speed)
-            
-            # Wrap position around boundaries
-            actor.wrap_position(self.grid.width, self.grid.height)
-            
-            # Deposit trail
-            actor.deposit_trail(self.grid)
+        # Age all actors
+        self.actor_ages += 1
+        
+        # Vectorized sensing and movement
+        self._sense_and_steer()
+        self._move_actors()
+        self._wrap_positions()
+        self._deposit_trails()
         
         # Apply lifecycle changes
         self._handle_deaths()
@@ -422,38 +488,174 @@ class PhysarumSimulation:
         
         # Apply decay to all trails
         self.grid.apply_decay(self.decay_rate)
+        
+        # Sync individual actors from vectorized arrays for backward compatibility
+        self._sync_actors_from_arrays()
+    
+    def _sense_and_steer(self) -> None:
+        """Vectorized sensing and steering for all actors."""
+        if self.num_actors == 0:
+            return
+            
+        sensor_angle_offset = 0.4  # Angle offset for left/right sensors
+        
+        # Calculate all sensor positions
+        center_x = self.actor_positions[:, 0] + np.cos(self.actor_angles) * self.view_distance
+        center_y = self.actor_positions[:, 1] + np.sin(self.actor_angles) * self.view_distance
+        
+        left_angles = self.actor_angles - sensor_angle_offset
+        left_x = self.actor_positions[:, 0] + np.cos(left_angles) * self.view_distance
+        left_y = self.actor_positions[:, 1] + np.sin(left_angles) * self.view_distance
+        
+        right_angles = self.actor_angles + sensor_angle_offset
+        right_x = self.actor_positions[:, 0] + np.cos(right_angles) * self.view_distance
+        right_y = self.actor_positions[:, 1] + np.sin(right_angles) * self.view_distance
+        
+        # Sample trail strength at sensor positions
+        left_sense = self._sample_trail_strength_vectorized(left_x, left_y)
+        center_sense = self._sample_trail_strength_vectorized(center_x, center_y)
+        right_sense = self._sample_trail_strength_vectorized(right_x, right_y)
+        
+        # Vectorized steering logic
+        turn_speed = 0.1
+        
+        # Continue straight if center is strongest
+        straight_mask = (center_sense >= left_sense) & (center_sense >= right_sense)
+        # Add small random variation
+        self.actor_angles[straight_mask] += (np.random.random(np.sum(straight_mask)) - 0.5) * 0.1
+        
+        # Turn left if left sensor is strongest
+        left_mask = (left_sense > center_sense) & (left_sense > right_sense)
+        self.actor_angles[left_mask] -= turn_speed
+        
+        # Turn right if right sensor is strongest  
+        right_mask = (right_sense > center_sense) & (right_sense > left_sense)
+        self.actor_angles[right_mask] += turn_speed
+    
+    def _sample_trail_strength_vectorized(self, x_coords: np.ndarray, y_coords: np.ndarray) -> np.ndarray:
+        """Sample trail strength at multiple positions using vectorized operations."""
+        # Convert to integer coordinates
+        x_int = np.clip(np.round(x_coords).astype(int), 0, self.grid.width - 1)
+        y_int = np.clip(np.round(y_coords).astype(int), 0, self.grid.height - 1)
+        
+        # For simplicity, sample at single points instead of circular areas
+        # This is a performance optimization that trades some accuracy for speed
+        return self.grid.trail_map[y_int, x_int]
+    
+    def _move_actors(self) -> None:
+        """Move all actors forward based on their angles."""
+        if self.num_actors == 0:
+            return
+            
+        # Vectorized movement
+        self.actor_positions[:, 0] += np.cos(self.actor_angles) * self.speed
+        self.actor_positions[:, 1] += np.sin(self.actor_angles) * self.speed
+    
+    def _wrap_positions(self) -> None:
+        """Wrap actor positions around grid boundaries."""
+        if self.num_actors == 0:
+            return
+            
+        # Wrap X coordinates
+        self.actor_positions[:, 0] = np.mod(self.actor_positions[:, 0], self.grid.width)
+        # Wrap Y coordinates
+        self.actor_positions[:, 1] = np.mod(self.actor_positions[:, 1], self.grid.height)
+    
+    def _deposit_trails(self) -> None:
+        """Deposit trails at all actor positions."""
+        if self.num_actors == 0:
+            return
+            
+        # Convert positions to integer coordinates
+        x_int = np.clip(np.round(self.actor_positions[:, 0]).astype(int), 0, self.grid.width - 1)
+        y_int = np.clip(np.round(self.actor_positions[:, 1]).astype(int), 0, self.grid.height - 1)
+        
+        # Deposit trails (using numpy's add.at for accumulation)
+        trail_amount = 1.0
+        np.add.at(self.grid.trail_map, (y_int, x_int), trail_amount)
     
     def _handle_deaths(self) -> None:
         """Remove actors that should die based on age and death probability."""
-        self.actors = [actor for actor in self.actors if not actor.should_die(self.death_probability)]
+        if self.num_actors == 0:
+            return
+            
+        # Use the original death probability calculation with age factor
+        death_rolls = np.random.random(self.num_actors)
+        
+        # Age-based death probability: older actors have higher chance of death
+        age_factors = 1.0 + (self.actor_ages * 0.001)  # Gradual increase with age
+        effective_death_probs = self.death_probability * age_factors
+        
+        # Keep actors that don't die
+        survival_mask = death_rolls >= effective_death_probs
+        
+        if np.any(survival_mask):
+            self.actor_positions = self.actor_positions[survival_mask]
+            self.actor_angles = self.actor_angles[survival_mask]
+            self.actor_ages = self.actor_ages[survival_mask]
+            self.num_actors = np.sum(survival_mask)
+        else:
+            # All actors died
+            self.num_actors = 0
+            self.actor_positions = np.empty((0, 2), dtype=np.float32)
+            self.actor_angles = np.empty(0, dtype=np.float32)
+            self.actor_ages = np.empty(0, dtype=np.int32)
+        
+        # Sync individual actors from vectorized arrays
+        self._sync_actors_from_arrays()
     
     def _handle_spawning(self) -> None:
         """Spawn new actors from existing actor locations based on spawn probability."""
-        if not self.actors:  # No actors to spawn from
+        if self.num_actors == 0:
+            return
+        
+        # First, sync vectorized arrays from individual actors 
+        # (in case they were modified outside of step())
+        if len(self.actors) > 0:
+            self._vectorize_actors()
+            
+        # Determine which actors spawn
+        spawn_rolls = np.random.random(self.num_actors)
+        spawn_mask = spawn_rolls < self.spawn_probability
+        num_spawns = np.sum(spawn_mask)
+        
+        if num_spawns == 0:
             return
             
-        new_actors = []
-        for actor in self.actors:
-            if random.random() < self.spawn_probability:
-                # Spawn new actor near this actor
-                spawn_distance = 5.0  # Distance from parent
-                spawn_angle = random.uniform(0, 2 * math.pi)
-                
-                new_x = actor.x + spawn_distance * math.cos(spawn_angle)
-                new_y = actor.y + spawn_distance * math.sin(spawn_angle)
-                
-                # Wrap around boundaries
-                new_x = new_x % self.grid.width
-                new_y = new_y % self.grid.height
-                
-                # Direction inheritance with triangular distribution (peak at 0, falloff to bounds)
-                deviation = random.triangular(-self.direction_deviation, self.direction_deviation, 0)
-                new_angle = actor.angle + deviation
-                new_actor = PhysarumActor(new_x, new_y, new_angle, self.view_radius, self.view_distance)
-                new_actors.append(new_actor)
+        # Get parent positions and angles
+        parent_positions = self.actor_positions[spawn_mask]
+        parent_angles = self.actor_angles[spawn_mask]
         
-        # Add new actors to the simulation
-        self.actors.extend(new_actors)
+        # Generate spawn positions
+        spawn_distance = 5.0
+        spawn_angles = np.random.uniform(0, 2 * np.pi, num_spawns)
+        
+        new_x = parent_positions[:, 0] + spawn_distance * np.cos(spawn_angles)
+        new_y = parent_positions[:, 1] + spawn_distance * np.sin(spawn_angles)
+        
+        # Wrap around boundaries
+        new_x = np.mod(new_x, self.grid.width)
+        new_y = np.mod(new_y, self.grid.height)
+        
+        # Direction inheritance with triangular distribution
+        if self.direction_deviation > 0:
+            deviations = np.random.triangular(-self.direction_deviation, 0, self.direction_deviation, num_spawns)
+        else:
+            deviations = np.zeros(num_spawns)
+        new_angles = parent_angles + deviations
+        
+        # Add new actors to arrays
+        if num_spawns > 0:
+            new_positions = np.column_stack([new_x, new_y])
+            new_ages = np.zeros(num_spawns, dtype=np.int32)
+            
+            self.actor_positions = np.vstack([self.actor_positions, new_positions])
+            self.actor_angles = np.concatenate([self.actor_angles, new_angles])
+            self.actor_ages = np.concatenate([self.actor_ages, new_ages])
+            self.num_actors += num_spawns
+            
+            # Sync individual actors from vectorized arrays
+            self._sync_actors_from_arrays()
     
     def run(self, steps: int) -> None:
         """Run the simulation for a specified number of steps.
