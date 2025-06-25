@@ -333,8 +333,9 @@ def run_simulation_with_3d_generation(args):
     try:
         preview_generator = PreviewGenerator(width=800, height=800)
         preview_title = f"Physarum 3D Model - {args.steps} steps"
-        preview_generator.generate_preview_from_simulation(
-            simulation, 
+        # Use the new 3D preview generation that shows layer stacking
+        preview_generator.generate_3d_preview_from_generator(
+            generator,  # Pass the 3D model generator which has the layer data 
             final_jpg_path, 
             threshold=args.threshold,
             title=preview_title
