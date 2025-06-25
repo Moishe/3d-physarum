@@ -4,8 +4,9 @@
 import os
 import json
 import sys
+import subprocess
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
 
 class OutputManager:
@@ -69,6 +70,61 @@ class OutputManager:
         
         return stl_path, json_path, jpg_path
     
+    def get_git_commit_hash(self) -> Optional[str]:
+        """Get the current git commit hash.
+        
+        Returns:
+            The git commit hash if available, None otherwise
+        """
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=os.getcwd()
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except (subprocess.SubprocessError, FileNotFoundError):
+            pass
+        return None
+    
+    def has_uncommitted_changes(self) -> bool:
+        """Check if there are uncommitted changes in the git repository.
+        
+        Returns:
+            True if there are uncommitted changes, False otherwise
+        """
+        try:
+            # Check for staged changes
+            result_staged = subprocess.run(
+                ["git", "diff", "--cached", "--quiet"],
+                capture_output=True,
+                cwd=os.getcwd()
+            )
+            
+            # Check for unstaged changes
+            result_unstaged = subprocess.run(
+                ["git", "diff", "--quiet"],
+                capture_output=True,
+                cwd=os.getcwd()
+            )
+            
+            # Check for untracked files
+            result_untracked = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                capture_output=True,
+                text=True,
+                cwd=os.getcwd()
+            )
+            
+            # If any of these return non-zero or untracked files exist, there are changes
+            return (result_staged.returncode != 0 or 
+                    result_unstaged.returncode != 0 or 
+                    (result_untracked.returncode == 0 and result_untracked.stdout.strip()))
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
+    
     def create_sidecar_json(self, json_path: str, args: Any, command_line: str) -> None:
         """Create a sidecar JSON file with parameters and command line.
         
@@ -82,11 +138,17 @@ class OutputManager:
         for key, value in vars(args).items():
             params[key] = value
         
+        # Get git information
+        git_hash = self.get_git_commit_hash()
+        has_uncommitted = self.has_uncommitted_changes()
+        
         # Create the sidecar data
         sidecar_data = {
             "parameters": params,
             "command_line": command_line,
-            "description": "Parameters and command line for 3D Physarum model generation"
+            "description": "Parameters and command line for 3D Physarum model generation",
+            "git_commit_hash": git_hash,
+            "has_uncommitted_changes": has_uncommitted
         }
         
         # Write the JSON file
