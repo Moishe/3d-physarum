@@ -101,13 +101,13 @@ export default function ErrorDisplay({
   if (compact) {
     return (
       <div className={`rounded-md border p-3 ${styles.container} ${className}`}>
-        <div className=\"flex items-start\">
-          <div className=\"flex-shrink-0\">
-            <svg className={`h-4 w-4 ${styles.icon}`} fill=\"currentColor\" viewBox=\"0 0 20 20\">
-              <path fillRule=\"evenodd\" d={styles.iconPath} clipRule=\"evenodd\" />
+        <div className="flex items-start">
+          <div className="flex-shrink-0">
+            <svg className={`h-4 w-4 ${styles.icon}`} fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d={styles.iconPath} clipRule="evenodd" />
             </svg>
           </div>
-          <div className=\"ml-2 flex-1\">
+          <div className="ml-2 flex-1">
             <h4 className={`text-sm font-medium ${styles.title}`}>
               {errorInfo.title}
             </h4>
@@ -115,14 +115,94 @@ export default function ErrorDisplay({
               {errorInfo.message}
             </p>
             {recoveryActions.length > 0 && (
-              <div className=\"mt-2 flex space-x-2\">
+              <div className="mt-2 flex space-x-2">
                 {recoveryActions.slice(0, 2).map((action, index) => (
                   <button
                     key={index}
-                    type=\"button\"
+                    type="button"
                     onClick={() => handleAction(action.action)}
-                    className={`text-xs px-2 py-1 rounded border transition-colors ${\n                      action.primary \n                        ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' \n                        : 'bg-transparent border-transparent text-gray-600 hover:bg-white hover:border-gray-300'\n                    }`}
+                    className={`text-xs px-2 py-1 rounded border transition-colors ${
+                      action.primary 
+                        ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50' 
+                        : 'bg-transparent border-transparent text-gray-600 hover:bg-white hover:border-gray-300'
+                    }`}
                   >
                     {action.label}
                   </button>
-                ))}\n              </div>\n            )}\n          </div>\n        </div>\n      </div>\n    );\n  }\n  \n  return (\n    <div className={`rounded-lg border p-4 ${styles.container} ${className}`}>\n      <div className=\"flex items-start\">\n        <div className=\"flex-shrink-0\">\n          <svg className={`h-5 w-5 ${styles.icon}`} fill=\"currentColor\" viewBox=\"0 0 20 20\">\n            <path fillRule=\"evenodd\" d={styles.iconPath} clipRule=\"evenodd\" />\n          </svg>\n        </div>\n        <div className=\"ml-3 flex-1\">\n          <h3 className={`text-sm font-medium ${styles.title}`}>\n            {errorInfo.title}\n            {errorInfo.code && (\n              <span className=\"ml-2 text-xs opacity-75\">(Code: {errorInfo.code})</span>\n            )}\n          </h3>\n          \n          <div className={`mt-2 text-sm ${styles.message}`}>\n            <p>{errorInfo.message}</p>\n          </div>\n          \n          {errorInfo.suggestions.length > 0 && (\n            <div className=\"mt-3\">\n              <p className={`text-sm font-medium ${styles.title} mb-2`}>What you can do:</p>\n              <ul className={`text-sm ${styles.message} space-y-1`}>\n                {errorInfo.suggestions.map((suggestion, index) => (\n                  <li key={index} className=\"flex items-start\">\n                    <span className=\"text-gray-400 mr-2\">\u2022</span>\n                    <span>{suggestion}</span>\n                  </li>\n                ))}\n              </ul>\n            </div>\n          )}\n          \n          {recoveryActions.length > 0 && (\n            <div className=\"mt-4 flex flex-wrap gap-2\">\n              {recoveryActions.map((action, index) => (\n                <button\n                  key={index}\n                  type=\"button\"\n                  onClick={() => handleAction(action.action)}\n                  className={`px-3 py-2 text-sm font-medium rounded-md border transition-colors ${\n                    action.primary\n                      ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm'\n                      : 'bg-transparent border-gray-200 text-gray-600 hover:bg-white hover:border-gray-300'\n                  }`}\n                >\n                  {action.label}\n                </button>\n              ))}\n            </div>\n          )}\n          \n          {errorInfo.type === 'unknown' && (\n            <details className=\"mt-4\">\n              <summary className={`text-sm cursor-pointer ${styles.title} opacity-75 hover:opacity-100`}>\n                Technical Details\n              </summary>\n              <div className=\"mt-2 p-2 bg-gray-100 rounded text-xs font-mono text-gray-600 overflow-auto\">\n                {error instanceof Error ? error.stack || error.message : JSON.stringify(error, null, 2)}\n              </div>\n            </details>\n          )}\n        </div>\n      </div>\n    </div>\n  );\n}
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className={`rounded-lg border p-4 ${styles.container} ${className}`}>
+      <div className="flex items-start">
+        <div className="flex-shrink-0">
+          <svg className={`h-5 w-5 ${styles.icon}`} fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d={styles.iconPath} clipRule="evenodd" />
+          </svg>
+        </div>
+        <div className="ml-3 flex-1">
+          <h3 className={`text-sm font-medium ${styles.title}`}>
+            {errorInfo.title}
+            {errorInfo.code && (
+              <span className="ml-2 text-xs opacity-75">(Code: {errorInfo.code})</span>
+            )}
+          </h3>
+          
+          <div className={`mt-2 text-sm ${styles.message}`}>
+            <p>{errorInfo.message}</p>
+          </div>
+          
+          {errorInfo.suggestions.length > 0 && (
+            <div className="mt-3">
+              <p className={`text-sm font-medium ${styles.title} mb-2`}>What you can do:</p>
+              <ul className={`text-sm ${styles.message} space-y-1`}>
+                {errorInfo.suggestions.map((suggestion, index) => (
+                  <li key={index} className="flex items-start">
+                    <span className="text-gray-400 mr-2">•</span>
+                    <span>{suggestion}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {recoveryActions.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {recoveryActions.map((action, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handleAction(action.action)}
+                  className={`px-3 py-2 text-sm font-medium rounded-md border transition-colors ${
+                    action.primary
+                      ? 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm'
+                      : 'bg-transparent border-gray-200 text-gray-600 hover:bg-white hover:border-gray-300'
+                  }`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {errorInfo.type === 'unknown' && (
+            <details className="mt-4">
+              <summary className={`text-sm cursor-pointer ${styles.title} opacity-75 hover:opacity-100`}>
+                Technical Details
+              </summary>
+              <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono text-gray-600 overflow-auto">
+                {error instanceof Error ? error.stack || error.message : JSON.stringify(error, null, 2)}
+              </div>
+            </details>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
