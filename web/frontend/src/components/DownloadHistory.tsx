@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { SimulationResult } from '../types/simulation';
+import { api } from '../services/api';
 
 interface HistoryItem extends SimulationResult {
   downloadedAt?: string;
@@ -246,8 +247,12 @@ const DownloadHistory = forwardRef<{ addToHistory: (result: SimulationResult) =>
                     {/* Download STL */}
                     <button
                       onClick={() => {
-                        // Mock download
-                        console.log('Downloading:', item.stlPath);
+                        const link = document.createElement('a');
+                        link.href = api.getDownloadUrl(item.jobId, 'stl');
+                        link.download = item.stlPath.split('/').pop() || 'model.stl';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
                       }}
                       className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                       title="Download STL"

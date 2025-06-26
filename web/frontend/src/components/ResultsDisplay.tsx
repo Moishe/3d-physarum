@@ -2,6 +2,7 @@
 // ABOUTME: Shows STL download, preview image, model statistics, and parameters used
 
 import type { SimulationResult } from '../types/simulation';
+import { api } from '../services/api';
 
 interface ResultsDisplayProps {
   result: SimulationResult | null;
@@ -28,9 +29,9 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
     return date.toLocaleString();
   };
 
-  const downloadFile = (path: string, filename: string) => {
+  const downloadFile = (jobId: string, fileType: 'stl' | 'json' | 'preview', filename: string) => {
     const link = document.createElement('a');
-    link.href = path;
+    link.href = api.getDownloadUrl(jobId, fileType);
     link.download = filename;
     document.body.appendChild(link);
     link.click();
@@ -97,7 +98,7 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
                       </p>
                     </div>
                     <button
-                      onClick={() => downloadFile(result.stlPath, result.stlPath.split('/').pop() || 'model.stl')}
+                      onClick={() => downloadFile(result.jobId, 'stl', result.stlPath.split('/').pop() || 'model.stl')}
                       className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +119,7 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
                       </p>
                     </div>
                     <button
-                      onClick={() => downloadFile(result.jsonPath, result.jsonPath.split('/').pop() || 'parameters.json')}
+                      onClick={() => downloadFile(result.jobId, 'json', result.jsonPath.split('/').pop() || 'parameters.json')}
                       className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +140,7 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
                       </p>
                     </div>
                     <button
-                      onClick={() => downloadFile(result.previewPath, result.previewPath.split('/').pop() || 'preview.jpg')}
+                      onClick={() => downloadFile(result.jobId, 'preview', result.previewPath.split('/').pop() || 'preview.jpg')}
                       className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     >
                       <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +268,7 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
         <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
           <div className="flex justify-between">
             <button
-              onClick={() => downloadFile(result.stlPath, result.stlPath.split('/').pop() || 'model.stl')}
+              onClick={() => downloadFile(result.jobId, 'stl', result.stlPath.split('/').pop() || 'model.stl')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
               <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
