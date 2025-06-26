@@ -1,9 +1,9 @@
 // ABOUTME: Main form component for simulation parameters organized in collapsible sections
 // ABOUTME: Handles form validation, presets, and parameter submission to the simulation API
 
-import React, { useState, useCallback, useMemo } from 'react';
-import type { SimulationParameters, ParameterPreset, PresetCategory } from '../types/simulation';
-import { DEFAULT_PARAMETERS, PARAMETER_PRESETS, PRESET_CATEGORIES } from '../types/simulation';
+import { useState, useCallback, useMemo } from 'react';
+import type { SimulationParameters, ParameterPreset } from '../types/simulation';
+import { DEFAULT_PARAMETERS, PRESET_CATEGORIES } from '../types/simulation';
 import { validateField, validateParameters, estimateSimulationTime } from '../utils/validation';
 
 interface ParameterFormProps {

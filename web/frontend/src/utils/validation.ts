@@ -16,8 +16,8 @@ const validationMessages = {
   validFilename: 'Filename must be valid (alphanumeric, dashes, underscores)',
 };
 
-// Base validation schema
-export const simulationParametersSchema = z.object({
+// Base validation schema without refinements
+const baseSimulationParametersSchema = z.object({
   // Simulation Parameters
   width: z.number({
     required_error: validationMessages.required,
@@ -170,7 +170,10 @@ export const simulationParametersSchema = z.object({
 
   quiet: z.boolean(),
   verbose: z.boolean(),
-}).refine((data) => {
+});
+
+// Export the refined schema for full validation
+export const simulationParametersSchema = baseSimulationParametersSchema.refine((data) => {
   // Custom validation: speedMin must be less than speedMax if both are provided
   if (data.speedMin !== undefined && data.speedMax !== undefined) {
     return data.speedMin <= data.speedMax;
@@ -200,7 +203,7 @@ export const simulationParametersSchema = z.object({
 // Individual field validation functions
 export const validateField = (field: keyof SimulationParameters, value: any): string | null => {
   try {
-    const fieldSchema = simulationParametersSchema.shape[field];
+    const fieldSchema = baseSimulationParametersSchema.shape[field];
     if (fieldSchema) {
       fieldSchema.parse(value);
     }

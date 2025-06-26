@@ -1,7 +1,7 @@
 // ABOUTME: Reusable error display component with user-friendly messages and recovery actions
 // ABOUTME: Provides consistent error presentation with severity-based styling and actionable suggestions
 
-import React from 'react';
+// No React imports needed for functional components in React 19
 import { formatErrorForUser, getRecoveryActions, type ErrorInfo } from '../utils/errorHandling';
 
 interface ErrorDisplayProps {

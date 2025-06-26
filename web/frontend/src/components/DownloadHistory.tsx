@@ -1,7 +1,7 @@
 // ABOUTME: Download history component displaying recent simulation results with quick access
 // ABOUTME: Manages local storage of simulation history and provides filtering and download actions
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { SimulationResult } from '../types/simulation';
 
 interface HistoryItem extends SimulationResult {
