@@ -1,8 +1,6 @@
 # ABOUTME: Converts web API parameters to main.py argument format and validates them
 # ABOUTME: Ensures compatibility between web interface and existing CLI simulation code
 
-import sys
-import os
 from argparse import Namespace
 from typing import List, Optional
 from ..models.simulation import SimulationParameters
@@ -75,37 +73,9 @@ class ParameterAdapter:
     
     @staticmethod
     def validate_web_parameters(parameters: SimulationParameters) -> List[str]:
-        """Validate web parameters using the same logic as main.py."""
-        errors = []
-        
-        try:
-            # Add project root to path for imports
-            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            project_root = os.path.dirname(os.path.dirname(backend_dir))
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
-            
-            # Import validation function from main.py
-            from main import validate_parameters
-            
-            # Convert to args format
-            args = ParameterAdapter.web_to_args(parameters)
-            
-            # Try to validate using main.py logic
-            # We need to catch SystemExit since validate_parameters calls sys.exit on error
-            try:
-                validate_parameters(args)
-            except SystemExit:
-                # If validation failed, we need to capture the errors manually
-                # Re-implement key validation checks here
-                errors.extend(ParameterAdapter._manual_validation(parameters))
-                
-        except Exception as e:
-            # Fallback to manual validation if import fails
-            errors.extend(ParameterAdapter._manual_validation(parameters))
-            errors.append(f"Validation import error: {str(e)}")
-        
-        return errors
+        """Validate web parameters using comprehensive validation logic."""
+        # Use direct validation instead of importing from main.py to avoid dependency issues
+        return ParameterAdapter._manual_validation(parameters)
     
     @staticmethod
     def _manual_validation(parameters: SimulationParameters) -> List[str]:
@@ -118,9 +88,9 @@ class ParameterAdapter:
         if parameters.height <= 0:
             errors.append("Height must be positive")
         
-        # Actor parameters
-        if parameters.actors <= 0:
-            errors.append("Number of actors must be positive")
+        # Actor parameters - only require positive actors if no image is provided
+        if parameters.image is None and parameters.actors <= 0:
+            errors.append("Number of actors must be positive when no image is provided")
         if parameters.steps <= 0:
             errors.append("Number of steps must be positive")
         
