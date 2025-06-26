@@ -2,7 +2,6 @@
 name = "physarum-web-backend"
 version = "1.0.0"
 description = "Backend API for 3D Physarum model generator web application"
-readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "fastapi==0.104.1",
@@ -25,6 +24,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [tool.uv]
 dev-dependencies = [
