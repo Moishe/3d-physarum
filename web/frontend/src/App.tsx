@@ -9,6 +9,7 @@ import ErrorDisplay from './components/ErrorDisplay';
 import DownloadHistory from './components/DownloadHistory';
 import type { SimulationParameters, SimulationStatus as StatusType, SimulationResult } from './types/simulation';
 import { PARAMETER_PRESETS } from './types/simulation';
+import { api } from './services/api';
 import './App.css';
 
 function App() {
@@ -19,106 +20,79 @@ function App() {
   const [formParameters, setFormParameters] = useState<Partial<SimulationParameters>>({});
   const historyRef = useRef<any>(null);
 
-  // Mock function to simulate API call - will be replaced with real API integration
   const startSimulation = async (parameters: SimulationParameters) => {
-    const jobId = `sim_${Date.now()}`;
-    
     setIsSimulating(true);
     setCurrentResult(null);
+    setCurrentError(null);
     
-    // Create initial status
-    const initialStatus: StatusType = {
-      jobId,
-      status: 'pending',
-      currentStep: 0,
-      totalSteps: parameters.steps,
-      capturedLayers: 0,
-      actorCount: parameters.actors,
-      trailStats: {
-        maxTrail: 0,
-        meanTrail: 0,
-      },
-      progress: 0,
-    };
-    
-    setCurrentStatus(initialStatus);
-
-    // Mock simulation progress
     try {
-      // Simulate running status
-      setTimeout(() => {
-        setCurrentStatus(prev => prev ? {
-          ...prev,
-          status: 'running',
-          estimatedTimeRemaining: Math.round(parameters.steps * 0.5), // Mock estimation
-        } : null);
-      }, 1000);
+      // Start the simulation
+      const { jobId } = await api.startSimulation(parameters);
+      
+      // Create initial status
+      const initialStatus: StatusType = {
+        jobId,
+        status: 'pending',
+        currentStep: 0,
+        totalSteps: parameters.steps,
+        capturedLayers: 0,
+        actorCount: parameters.actors,
+        trailStats: {
+          maxTrail: 0,
+          meanTrail: 0,
+        },
+        progress: 0,
+      };
+      
+      setCurrentStatus(initialStatus);
 
-      // Mock progress updates
-      const progressInterval = setInterval(() => {
-        setCurrentStatus(prev => {
-          if (!prev || prev.status !== 'running') return prev;
+      // Poll for status updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await api.getSimulationStatus(jobId);
+          setCurrentStatus(status);
           
-          const newStep = Math.min(prev.currentStep + Math.floor(Math.random() * 5) + 1, prev.totalSteps);
-          const progress = (newStep / prev.totalSteps) * 100;
-          const layersCapturing = Math.floor(newStep / parameters.layerFrequency);
+          // If simulation is completed, get the result
+          if (status.status === 'completed') {
+            clearInterval(pollInterval);
+            try {
+              const result = await api.getSimulationResult(jobId);
+              setCurrentResult(result);
+              setIsSimulating(false);
+              
+              // Add to download history
+              if (historyRef.current && historyRef.current.addToHistory) {
+                historyRef.current.addToHistory(result);
+              }
+            } catch (resultError) {
+              console.error('Error fetching result:', resultError);
+              setCurrentError(resultError instanceof Error ? resultError : new Error(String(resultError)));
+              setIsSimulating(false);
+            }
+          }
           
-          return {
-            ...prev,
-            currentStep: newStep,
-            capturedLayers: layersCapturing,
-            actorCount: prev.actorCount + Math.floor(Math.random() * 10) - 5, // Simulate actor changes
-            trailStats: {
-              maxTrail: Math.random() * 1.0,
-              meanTrail: Math.random() * 0.5,
-            },
-            progress,
-            estimatedTimeRemaining: Math.max(0, Math.round((prev.totalSteps - newStep) * 0.5)),
-          };
-        });
-      }, 2000);
-
-      // Mock completion after simulation time
-      setTimeout(() => {
-        clearInterval(progressInterval);
-        
-        setCurrentStatus(prev => prev ? {
-          ...prev,
-          status: 'completed',
-          currentStep: prev.totalSteps,
-          progress: 100,
-          estimatedTimeRemaining: 0,
-        } : null);
-
-        // Mock result
-        const mockResult: SimulationResult = {
-          jobId,
-          stlPath: `/api/download/${jobId}/model.stl`,
-          jsonPath: `/api/download/${jobId}/parameters.json`,
-          previewPath: `/api/download/${jobId}/preview.jpg`,
-          fileSize: Math.floor(Math.random() * 1024 * 1024 * 5), // Random file size up to 5MB
-          parameters,
-          meshMetrics: parameters.meshQuality ? {
-            vertexCount: Math.floor(Math.random() * 50000) + 10000,
-            faceCount: Math.floor(Math.random() * 100000) + 20000,
-            volume: Math.random() * 1000 + 100,
-            surfaceArea: Math.random() * 5000 + 1000,
-            isWatertight: Math.random() > 0.2,
-            isWindingConsistent: Math.random() > 0.1,
-            printReady: Math.random() > 0.3,
-            issues: Math.random() > 0.5 ? [] : ['Minor self-intersections detected', 'Some faces may be too small for printing'],
-          } : undefined,
-          completedAt: new Date().toISOString(),
-        };
-
-        setCurrentResult(mockResult);
-        setIsSimulating(false);
-        
-        // Add to download history
-        if (historyRef.current && historyRef.current.addToHistory) {
-          historyRef.current.addToHistory(mockResult);
+          // If simulation failed or was cancelled, stop polling
+          if (status.status === 'failed' || status.status === 'cancelled') {
+            clearInterval(pollInterval);
+            setIsSimulating(false);
+            if (status.status === 'failed' && status.error) {
+              setCurrentError(new Error(status.error));
+            }
+          }
+        } catch (statusError) {
+          console.error('Error polling status:', statusError);
+          // Continue polling on status errors to handle temporary network issues
         }
-      }, parameters.steps * 100); // Mock duration based on steps
+      }, 2000); // Poll every 2 seconds
+
+      // Set a timeout to stop polling after a reasonable time
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isSimulating) {
+          setCurrentError(new Error('Simulation timed out'));
+          setIsSimulating(false);
+        }
+      }, 30 * 60 * 1000); // 30 minutes timeout
 
     } catch (error) {
       console.error('Simulation error:', error);
@@ -132,12 +106,20 @@ function App() {
     }
   };
 
-  const handleCancel = () => {
-    setCurrentStatus(prev => prev ? {
-      ...prev,
-      status: 'cancelled',
-    } : null);
-    setIsSimulating(false);
+  const handleCancel = async () => {
+    if (currentStatus?.jobId) {
+      try {
+        await api.cancelSimulation(currentStatus.jobId);
+        setCurrentStatus(prev => prev ? {
+          ...prev,
+          status: 'cancelled',
+        } : null);
+        setIsSimulating(false);
+      } catch (error) {
+        console.error('Error cancelling simulation:', error);
+        setCurrentError(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
   };
 
   const handleNewSimulation = () => {
