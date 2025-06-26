@@ -4,7 +4,8 @@ requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.11'",
     "python_full_version == '3.10.*'",
-    "python_full_version < '3.10'",
+    "python_full_version > '3.9' and python_full_version < '3.10'",
+    "python_full_version <= '3.9'",
 ]
 
 [[package]]
@@ -44,7 +45,8 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.10'",
+    "python_full_version > '3.9' and python_full_version < '3.10'",
+    "python_full_version <= '3.9'",
 ]
 dependencies = [
     { name = "colorama", marker = "python_full_version < '3.10' and sys_platform == 'win32'" },
@@ -209,7 +211,8 @@ name = "numpy"
 version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.10'",
+    "python_full_version > '3.9' and python_full_version < '3.10'",
+    "python_full_version <= '3.9'",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/75/10dd1f8116a8b796cb2c737b674e02d02e80454bda953fa7e65d8c12b016/numpy-2.0.2.tar.gz", hash = "sha256:883c987dee1880e2a864ab0dc9892292582510604156762362d9326444636e78", size = 18902015 }
 wheels = [
@@ -386,6 +389,42 @@ wheels = [
 ]
 
 [[package]]
+name = "numpy-stl"
+version = "3.1.2"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version <= '3.9'",
+]
+dependencies = [
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.9'" },
+    { name = "python-utils", marker = "python_full_version <= '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/7a/89fab400cf50cbb95d3b332617797d0a753d866355d51fc0fcfcdc6da8f5/numpy_stl-3.1.2.tar.gz", hash = "sha256:72b46950dfa3642df1c7b873cfa78a548533724b907478c567db42fdf57ee3d2", size = 821613 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/a1/4b6e01765f1709483b54ad2241ad5d0c5cfb2dc62800acde8ea26fde43c8/numpy_stl-3.1.2-py3-none-any.whl", hash = "sha256:a55288340c837378bf44753a1c595c6823312995acda97f27ed04db4ff1d25f3", size = 20039 },
+]
+
+[[package]]
+name = "numpy-stl"
+version = "3.2.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11'",
+    "python_full_version == '3.10.*'",
+    "python_full_version > '3.9' and python_full_version < '3.10'",
+]
+dependencies = [
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version > '3.9' and python_full_version < '3.10'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "python-utils", marker = "python_full_version > '3.9'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/80/96366d1b69223d4ca55fca30f158096df169b00aa6b4dd963025980e7ede/numpy_stl-3.2.0.tar.gz", hash = "sha256:5a20c3f79cddaa0abc6a4b99f5486aceed4f88152f29b19a57acc844e183fd4d", size = 824382 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ea/2c/e17b8814050427929077639d35a42187a006922600d4840475bdc5f64ebb/numpy_stl-3.2.0-py3-none-any.whl", hash = "sha256:697c81b107231362460aaedf4647e81ba54f54f59c896772fea7904c9c439da5", size = 20775 },
+]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -403,6 +442,8 @@ dependencies = [
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "numpy", version = "2.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "numpy-stl", version = "3.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version <= '3.9'" },
+    { name = "numpy-stl", version = "3.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version > '3.9'" },
     { name = "pillow" },
     { name = "psutil" },
     { name = "pydantic" },
@@ -410,7 +451,6 @@ dependencies = [
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scipy", version = "1.16.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "stl" },
     { name = "trimesh" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "websockets" },
@@ -435,6 +475,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.104.1" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.24.0" },
     { name = "numpy", specifier = ">=1.21.0" },
+    { name = "numpy-stl", specifier = ">=3.1.2" },
     { name = "pillow", specifier = ">=8.3.0" },
     { name = "psutil", specifier = ">=5.9.0" },
     { name = "pydantic", specifier = "==2.5.0" },
@@ -442,7 +483,6 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "python-multipart", specifier = "==0.0.6" },
     { name = "scipy", specifier = ">=1.10.0" },
-    { name = "stl", specifier = ">=0.0.3" },
     { name = "trimesh", specifier = ">=3.15.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.24.0" },
     { name = "websockets", specifier = "==12.0" },
@@ -716,6 +756,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-utils"
+version = "3.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/13/4c/ef8b7b1046d65c1f18ca31e5235c7d6627ca2b3f389ab1d44a74d22f5cc9/python_utils-3.9.1.tar.gz", hash = "sha256:eb574b4292415eb230f094cbf50ab5ef36e3579b8f09e9f2ba74af70891449a0", size = 35403 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/69/31c82567719b34d8f6b41077732589104883771d182a9f4ff3e71430999a/python_utils-3.9.1-py2.py3-none-any.whl", hash = "sha256:0273d7363c7ad4b70999b2791d5ba6b55333d6f7a4e4c8b6b39fb82b5fab4613", size = 32078 },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -773,7 +825,8 @@ name = "scipy"
 version = "1.13.1"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "python_full_version < '3.10'",
+    "python_full_version > '3.9' and python_full_version < '3.10'",
+    "python_full_version <= '3.9'",
 ]
 dependencies = [
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
@@ -936,12 +989,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/06/68/559bed5484e746f1a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/f8/e2cca22387965584a409795913b774235752be4176d276714e15e1a58884/starlette-0.27.0-py3-none-any.whl", hash = "sha256:918416370e846586541235ccd38a474c08b80443ed31c578a418e2209b3eef91", size = 66978 },
 ]
-
-[[package]]
-name = "stl"
-version = "0.0.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/aa/91/4bdb12160348109179158d34e6eda6279166302ec0224d6edc8324f344df/stl-0.0.3.tar.gz", hash = "sha256:03a6b58ad52ecf16823b1cf1acf6ef382aa5c0fc1152379f464e284a4f81304b", size = 4230 }
 
 [[package]]
 name = "tomli"
