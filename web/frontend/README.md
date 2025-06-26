@@ -1,11 +1,58 @@
-# React + TypeScript + Vite
+# Physarum Web Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+ABOUTME: React frontend for the Physarum 3D model generator web application
+ABOUTME: Provides web interface for setting simulation parameters and downloading STL files
 
-Currently, two official plugins are available:
+This is the React frontend for the Physarum 3D model generator web application. It provides a user-friendly interface for configuring simulation parameters and downloading generated STL files.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Tech Stack
+
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **Tailwind CSS** + **Headless UI** for styling and components
+- **React Hook Form** + **Zod** for form validation
+- **React Query** for state management and API calls
+- **Socket.IO** for real-time simulation progress updates
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ and npm
+
+### Installation & Development
+
+1. Navigate to the frontend directory:
+   ```bash
+   cd web/frontend
+   ```
+
+2. Install dependencies (if not already done):
+   ```bash
+   npm install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open your browser and navigate to `http://localhost:5173`
+
+### Available Scripts
+
+- `npm run dev` - Start development server with hot reload
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Run ESLint
+
+## Features
+
+The frontend will include:
+- Parameter form for simulation configuration
+- Real-time progress updates during simulation
+- STL file download functionality
+- Simulation history and results display
 
 ## Expanding the ESLint configuration
 
