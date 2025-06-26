@@ -7,6 +7,9 @@ from typing import Dict, Any
 import os
 import logging
 import time
+import psutil
+import traceback
+import sys
 
 from ...models.simulation import (
     SimulationRequest, SimulationResponse, SimulationStatusResponse,
@@ -19,6 +22,111 @@ from ...core.parameter_adapter import ParameterAdapter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["simulation"])
+
+
+def get_debug_context(job_id: str = None, parameters: Dict = None) -> Dict[str, Any]:
+    """Collect comprehensive debugging context for exception handling."""
+    try:
+        # System resource information
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        disk_usage = psutil.disk_usage('/')
+        
+        # Process information
+        process = psutil.Process()
+        process_memory = process.memory_info()
+        
+        # Simulation manager state
+        manager_stats = simulation_manager.get_job_statistics()
+        
+        debug_context = {
+            "timestamp": time.time(),
+            "system": {
+                "memory_total_gb": round(memory.total / (1024**3), 2),
+                "memory_available_gb": round(memory.available / (1024**3), 2),
+                "memory_percent": memory.percent,
+                "cpu_percent": cpu_percent,
+                "disk_free_gb": round(disk_usage.free / (1024**3), 2),
+                "disk_percent": round((disk_usage.used / disk_usage.total) * 100, 1)
+            },
+            "process": {
+                "memory_rss_mb": round(process_memory.rss / (1024**2), 2),
+                "memory_vms_mb": round(process_memory.vms / (1024**2), 2),
+                "pid": process.pid,
+                "threads": process.num_threads()
+            },
+            "simulation_manager": {
+                "total_jobs": manager_stats["total_jobs"],
+                "active_jobs": manager_stats["active_jobs"],
+                "max_concurrent": manager_stats["max_concurrent_jobs"],
+                "status_counts": manager_stats["status_counts"]
+            }
+        }
+        
+        # Add job-specific context if available
+        if job_id:
+            debug_context["job_context"] = {
+                "job_id": job_id,
+                "exists": job_id in simulation_manager.jobs
+            }
+            
+            if job_id in simulation_manager.jobs:
+                job = simulation_manager.jobs[job_id]
+                debug_context["job_context"].update({
+                    "status": job.status.value,
+                    "started_at": job.started_at,
+                    "runtime_seconds": (time.time() - job.started_at) if job.started_at else None,
+                    "has_progress": job.progress is not None,
+                    "cancel_requested": job.cancel_requested,
+                    "result_files_count": len(job.result_files)
+                })
+        
+        # Add parameter context if available
+        if parameters:
+            debug_context["parameters"] = {
+                "steps": getattr(parameters, 'steps', None),
+                "actors": getattr(parameters, 'actors', None),
+                "width": getattr(parameters, 'width', None),
+                "height": getattr(parameters, 'height', None),
+                "smooth": getattr(parameters, 'smooth', None)
+            }
+        
+        return debug_context
+        
+    except Exception as e:
+        # Fallback debug context if collecting fails
+        return {
+            "debug_collection_error": str(e),
+            "timestamp": time.time(),
+            "basic_info": {
+                "job_id": job_id,
+                "parameters_provided": parameters is not None
+            }
+        }
+
+
+def log_detailed_exception(operation: str, exception: Exception, context: Dict[str, Any]):
+    """Log exception with comprehensive debugging information."""
+    # Get full stack trace
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    stack_trace = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    
+    # Extract local variables from the traceback
+    local_vars = {}
+    if exc_traceback:
+        frame = exc_traceback.tb_frame
+        local_vars = {k: repr(v)[:200] for k, v in frame.f_locals.items() 
+                     if not k.startswith('_') and k not in ['request', 'self']}
+    
+    logger.error(
+        f"DETAILED EXCEPTION in {operation}:\n"
+        f"Exception Type: {type(exception).__name__}\n"
+        f"Exception Message: {str(exception)}\n"
+        f"Context: {context}\n"
+        f"Local Variables: {local_vars}\n"
+        f"Stack Trace: {''.join(stack_trace)}",
+        exc_info=True
+    )
 
 
 @router.post("/simulate", response_model=SimulationResponse)
@@ -54,12 +162,15 @@ async def start_simulation(request: SimulationRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error starting simulation: {e}", exc_info=True)
+        debug_context = get_debug_context(parameters=request.parameters)
+        log_detailed_exception("start_simulation", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to start simulation: {str(e)}"
+                "message": f"Failed to start simulation: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__
             }
         )
 
@@ -91,12 +202,16 @@ async def get_simulation_status(job_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting simulation status for {job_id}: {e}", exc_info=True)
+        debug_context = get_debug_context(job_id=job_id)
+        log_detailed_exception("get_simulation_status", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to get simulation status: {str(e)}"
+                "message": f"Failed to get simulation status: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "job_id": job_id
             }
         )
 
@@ -144,12 +259,16 @@ async def get_simulation_result(job_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting simulation result for {job_id}: {e}", exc_info=True)
+        debug_context = get_debug_context(job_id=job_id)
+        log_detailed_exception("get_simulation_result", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to get simulation result: {str(e)}"
+                "message": f"Failed to get simulation result: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "job_id": job_id
             }
         )
 
@@ -203,12 +322,16 @@ async def get_simulation_preview(job_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting preview for {job_id}: {e}", exc_info=True)
+        debug_context = get_debug_context(job_id=job_id)
+        log_detailed_exception("get_simulation_preview", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to get preview: {str(e)}"
+                "message": f"Failed to get preview: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "job_id": job_id
             }
         )
 
@@ -245,12 +368,16 @@ async def cancel_simulation(job_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error cancelling simulation {job_id}: {e}", exc_info=True)
+        debug_context = get_debug_context(job_id=job_id)
+        log_detailed_exception("cancel_simulation", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to cancel simulation: {str(e)}"
+                "message": f"Failed to cancel simulation: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "job_id": job_id
             }
         )
 
@@ -325,12 +452,18 @@ async def download_simulation_file(job_id: str, file_type: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error downloading file {file_type} for {job_id}: {e}", exc_info=True)
+        debug_context = get_debug_context(job_id=job_id)
+        debug_context["file_type"] = file_type
+        log_detailed_exception("download_simulation_file", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to download file: {str(e)}"
+                "message": f"Failed to download file: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "job_id": job_id,
+                "file_type": file_type
             }
         )
 
@@ -346,12 +479,15 @@ async def list_jobs():
         }
         
     except Exception as e:
-        logger.error(f"Error getting job statistics: {e}", exc_info=True)
+        debug_context = get_debug_context()
+        log_detailed_exception("list_jobs", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to get job statistics: {str(e)}"
+                "message": f"Failed to get job statistics: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__
             }
         )
 
@@ -366,11 +502,16 @@ async def cleanup_old_jobs(max_age_hours: int = 24):
         )
         
     except Exception as e:
-        logger.error(f"Error during job cleanup: {e}", exc_info=True)
+        debug_context = get_debug_context()
+        debug_context["max_age_hours"] = max_age_hours
+        log_detailed_exception("cleanup_old_jobs", e, debug_context)
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Internal server error",
-                "message": f"Failed to cleanup jobs: {str(e)}"
+                "message": f"Failed to cleanup jobs: {str(e)}",
+                "debug_context": debug_context if logger.level <= logging.DEBUG else None,
+                "error_type": type(e).__name__,
+                "max_age_hours": max_age_hours
             }
         )

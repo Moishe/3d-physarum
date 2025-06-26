@@ -6,6 +6,9 @@ import uuid
 import time
 import os
 import logging
+import traceback
+import sys
+import psutil
 from typing import Dict, Optional, Callable, Any
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -49,6 +52,105 @@ class SimulationManager:
         os.makedirs(output_dir, exist_ok=True)
         
         logger.info(f"SimulationManager initialized with max {max_concurrent_jobs} concurrent jobs")
+    
+    def _get_simulation_debug_context(self, job_id: str, exception: Exception = None) -> Dict[str, Any]:
+        """Collect comprehensive debugging context for simulation operations."""
+        try:
+            # System resource information
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            disk_usage = psutil.disk_usage('/')
+            
+            # Process information
+            process = psutil.Process()
+            process_memory = process.memory_info()
+            
+            debug_context = {
+                "timestamp": time.time(),
+                "job_id": job_id,
+                "system": {
+                    "memory_total_gb": round(memory.total / (1024**3), 2),
+                    "memory_available_gb": round(memory.available / (1024**3), 2),
+                    "memory_percent": memory.percent,
+                    "cpu_percent": cpu_percent,
+                    "disk_free_gb": round(disk_usage.free / (1024**3), 2),
+                    "disk_percent": round((disk_usage.used / disk_usage.total) * 100, 1)
+                },
+                "process": {
+                    "memory_rss_mb": round(process_memory.rss / (1024**2), 2),
+                    "memory_vms_mb": round(process_memory.vms / (1024**2), 2),
+                    "pid": process.pid,
+                    "threads": process.num_threads()
+                },
+                "simulation_manager": {
+                    "total_jobs": len(self.jobs),
+                    "active_jobs": len(self.active_jobs),
+                    "max_concurrent": self.max_concurrent_jobs,
+                    "output_dir": self.output_dir
+                }
+            }
+            
+            # Add job-specific context
+            if job_id in self.jobs:
+                job = self.jobs[job_id]
+                debug_context["job"] = {
+                    "status": job.status.value,
+                    "started_at": job.started_at,
+                    "runtime_seconds": (time.time() - job.started_at) if job.started_at else None,
+                    "parameters": {
+                        "steps": job.parameters.steps,
+                        "actors": job.parameters.actors,
+                        "width": job.parameters.width,
+                        "height": job.parameters.height,
+                        "smooth": job.parameters.smooth,
+                        "layer_height": job.parameters.layer_height,
+                        "threshold": job.parameters.threshold
+                    },
+                    "has_progress": job.progress is not None,
+                    "cancel_requested": job.cancel_requested,
+                    "result_files_count": len(job.result_files),
+                    "current_progress": {
+                        "step": job.progress.step if job.progress else None,
+                        "total_steps": job.progress.total_steps if job.progress else None,
+                        "actor_count": job.progress.actor_count if job.progress else None,
+                        "layers_captured": job.progress.layers_captured if job.progress else None
+                    } if job.progress else None
+                }
+            
+            # Add exception context if provided
+            if exception:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                debug_context["exception"] = {
+                    "type": type(exception).__name__,
+                    "message": str(exception),
+                    "traceback_summary": traceback.format_exception_only(exc_type, exc_value)[-1].strip() if exc_type else None
+                }
+                
+                # Extract local variables from the deepest traceback frame
+                if exc_traceback:
+                    frame = exc_traceback
+                    while frame.tb_next:
+                        frame = frame.tb_next
+                    
+                    local_vars = {}
+                    try:
+                        for k, v in frame.tb_frame.f_locals.items():
+                            if not k.startswith('_') and k not in ['self', 'args', 'kwargs']:
+                                local_vars[k] = repr(v)[:200]  # Limit string length
+                        debug_context["exception"]["local_variables"] = local_vars
+                    except Exception:
+                        debug_context["exception"]["local_variables"] = "Unable to extract local variables"
+            
+            return debug_context
+            
+        except Exception as e:
+            # Fallback debug context if collection fails
+            return {
+                "debug_collection_error": str(e),
+                "timestamp": time.time(),
+                "job_id": job_id,
+                "basic_info": "Failed to collect full debug context"
+            }
     
     def generate_job_id(self) -> str:
         """Generate a unique job ID."""
@@ -101,10 +203,23 @@ class SimulationManager:
             )
             
         except Exception as e:
-            logger.error(f"Simulation {job_id} failed: {e}", exc_info=True)
+            # Collect comprehensive debug context for simulation failures
+            debug_context = self._get_simulation_debug_context(job_id, e)
+            
+            logger.error(
+                f"DETAILED SIMULATION FAILURE for job {job_id}:\n"
+                f"Exception: {type(e).__name__}: {str(e)}\n"
+                f"Debug Context: {debug_context}",
+                exc_info=True
+            )
+            
             job.status = SimulationStatus.failed
-            job.error_message = str(e)
+            job.error_message = f"{type(e).__name__}: {str(e)}"
             job.completed_at = time.time()
+            
+            # Store debug context in job for later reference
+            if not hasattr(job, 'debug_context'):
+                job.debug_context = debug_context
             
         finally:
             # Clean up active job reference
@@ -331,10 +446,24 @@ class SimulationManager:
             logger.info(f"Simulation {job_id} cancelled by user")
             
         except Exception as e:
+            # Collect detailed debug context for sync simulation failures
+            debug_context = self._get_simulation_debug_context(job_id, e)
+            
+            logger.error(
+                f"DETAILED SYNC SIMULATION FAILURE for job {job_id}:\n"
+                f"Exception: {type(e).__name__}: {str(e)}\n"
+                f"Debug Context: {debug_context}",
+                exc_info=True
+            )
+            
             job.status = SimulationStatus.failed
-            job.error_message = str(e)
+            job.error_message = f"{type(e).__name__}: {str(e)}"
             job.completed_at = time.time()
-            logger.error(f"Simulation {job_id} failed: {e}", exc_info=True)
+            
+            # Store debug context in job for later reference
+            if not hasattr(job, 'debug_context'):
+                job.debug_context = debug_context
+            
             raise
     
     def _start_next_queued_job(self):
