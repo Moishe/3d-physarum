@@ -19,18 +19,18 @@ This document outlines the plan to create a web application for the 3D Physarum 
 - [x] Setup WebSocket client for real-time updates
 
 ### 2. Core Components
-- [ ] **ParameterForm**: Main form with all simulation parameters organized in sections:
+- [x] **ParameterForm**: Main form with all simulation parameters organized in sections:
   - Simulation Parameters (width, height, actors, steps, decay, etc.)
   - 3D Model Parameters (smooth, layer_height, threshold, smoothing options)
   - Output Parameters (filename)
   - Advanced Parameters (collapsed by default)
-- [ ] **SimulationStatus**: Progress display component showing:
+- [x] **SimulationStatus**: Progress display component showing:
   - Current simulation step
   - Captured layers count
   - Actor count
   - Trail statistics
   - Estimated time remaining
-- [ ] **ResultsDisplay**: Shows completed simulation results with:
+- [x] **ResultsDisplay**: Shows completed simulation results with:
   - Download button for STL file
   - Preview image
   - Model statistics (file size, mesh quality)
