@@ -6,7 +6,7 @@ import ParameterForm from './components/ParameterForm';
 import SimulationStatus from './components/SimulationStatus';
 import ResultsDisplay from './components/ResultsDisplay';
 import ErrorDisplay from './components/ErrorDisplay';
-import DownloadHistory from './components/DownloadHistory';
+import ModelHistory from './components/ModelHistory';
 import type { SimulationParameters, SimulationStatus as StatusType, SimulationResult } from './types/simulation';
 import { PARAMETER_PRESETS } from './types/simulation';
 import { api } from './services/api';
@@ -243,8 +243,8 @@ function App() {
               onNewSimulation={handleNewSimulation}
             />
             
-            {/* Show download history below results */}
-            <DownloadHistory
+            {/* Show model history below results */}
+            <ModelHistory
               ref={historyRef}
               onLoadParameters={handleLoadParameters}
               onNewSimulation={handleNewSimulation}
@@ -252,10 +252,10 @@ function App() {
           </div>
         )}
         
-        {/* Show download history when not simulating and no current result */}
+        {/* Show model history when not simulating and no current result */}
         {!isSimulating && !currentResult && !currentError && (
           <div className="mt-8">
-            <DownloadHistory
+            <ModelHistory
               ref={historyRef}
               onLoadParameters={handleLoadParameters}
               onNewSimulation={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
