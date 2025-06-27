@@ -54,31 +54,35 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
     }
   };
 
-  const updateParameter = useCallback((key: keyof SimulationParameters, value: any) => {
-    setParameters(prev => ({ ...prev, [key]: value }));
-    
-    // Mark field as touched
-    setTouched(prev => ({ ...prev, [key]: true }));
-    
-    // Validate individual field
-    const error = validateField(key, value);
-    setFieldErrors(prev => {
-      const newErrors = { ...prev };
-      if (error) {
-        newErrors[key] = error;
-      } else {
-        delete newErrors[key];
-      }
-      return newErrors;
-    });
-    
-    // Re-validate entire form for cross-field validation
-    setTimeout(() => {
-      const newParams = { ...parameters, [key]: value };
+  const updateParameter = useCallback((key: keyof SimulationParameters, value: SimulationParameters[keyof SimulationParameters]) => {
+    // Batch all state updates to prevent multiple re-renders
+    setParameters(prev => {
+      const newParams = { ...prev, [key]: value };
+      
+      // Validate individual field
+      const error = validateField(key, value);
+      
+      // Update touched state
+      setTouched(prevTouched => ({ ...prevTouched, [key]: true }));
+      
+      // Update field errors
+      setFieldErrors(prevErrors => {
+        const newErrors = { ...prevErrors };
+        if (error) {
+          newErrors[key] = error;
+        } else {
+          delete newErrors[key];
+        }
+        return newErrors;
+      });
+      
+      // Re-validate entire form for cross-field validation (synchronously)
       const validation = validateParameters(newParams);
       setFieldWarnings(validation.warnings);
-    }, 0);
-  }, [parameters]);
+      
+      return newParams;
+    });
+  }, []);
 
   const applyPreset = useCallback((preset: ParameterPreset) => {
     const newParams = { ...parameters, ...preset.parameters };
@@ -137,8 +141,8 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
   }: {
     label: string;
     type?: string;
-    value: any;
-    onChange: (value: any) => void;
+    value: string | number;
+    onChange: (value: string | number) => void;
     min?: number;
     max?: number;
     step?: number;
@@ -587,7 +591,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                       { value: 'feature_preserving', label: 'Feature Preserving' },
                       { value: 'boundary_outline', label: 'Boundary Outline' }
                     ]}
-                    onChange={(value) => updateParameter('smoothingType', value as any)}
+                    onChange={(value) => updateParameter('smoothingType', value as 'laplacian' | 'taubin' | 'feature_preserving' | 'boundary_outline')}
                     help="Type of smoothing algorithm"
                   />
                   {parameters.smoothingType === 'taubin' && (

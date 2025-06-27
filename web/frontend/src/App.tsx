@@ -139,12 +139,11 @@ function App() {
   
   const handleErrorUsePreset = () => {
     setCurrentError(null);
-    // Reset and scroll to presets
+    // Reset to show presets
     setCurrentStatus(null);
     setCurrentResult(null);
     setIsSimulating(false);
-    // Scroll to top where presets are
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Don't auto-scroll as this may interfere with user input
   };
   
   const handleErrorSimplify = () => {
@@ -181,8 +180,7 @@ function App() {
     setCurrentResult(null);
     setCurrentStatus(null);
     setIsSimulating(false);
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Don't auto-scroll as this may interfere with user input
   };
 
   return (
