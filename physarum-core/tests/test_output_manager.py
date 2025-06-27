@@ -7,7 +7,7 @@ import os
 import json
 import shutil
 from unittest.mock import Mock
-from output_manager import OutputManager
+from physarum_core.output.manager import OutputManager
 
 
 class TestOutputManager(unittest.TestCase):

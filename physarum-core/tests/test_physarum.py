@@ -3,7 +3,7 @@
 
 import pytest
 import numpy as np
-from physarum import PhysarumGrid, PhysarumActor, PhysarumSimulation
+from physarum_core.simulation import PhysarumGrid, PhysarumActor, PhysarumSimulation
 
 
 class TestPhysarumGrid:

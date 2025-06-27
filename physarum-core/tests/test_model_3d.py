@@ -5,8 +5,8 @@ import pytest
 import numpy as np
 import os
 import tempfile
-from model_3d import Model3DGenerator, generate_3d_model_from_simulation
-from physarum import PhysarumSimulation
+from physarum_core.models.model_3d import Model3DGenerator, generate_3d_model_from_simulation
+from physarum_core.simulation import PhysarumSimulation
 
 
 class TestModel3DGenerator:

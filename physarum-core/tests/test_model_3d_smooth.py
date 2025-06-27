@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 import tempfile
 import os
-from physarum import PhysarumSimulation
+from physarum_core.simulation import PhysarumSimulation
 from model_3d_smooth import SmoothModel3DGenerator, generate_smooth_3d_model_from_simulation
 
 
