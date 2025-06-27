@@ -14,9 +14,9 @@ interface ParameterFormProps {
 
 const SectionHeader = ({ title, section, expandedSections, toggleSection, children }: { 
   title: string; 
-  section: string;
+  section: 'simulation' | 'model3d' | 'output' | 'advanced';
   expandedSections: Record<string, boolean>;
-  toggleSection: (section: string) => void;
+  toggleSection: (section: 'simulation' | 'model3d' | 'output' | 'advanced') => void;
   children: React.ReactNode;
 }) => (
   <div className="border border-gray-200 rounded-lg mb-4">
@@ -37,6 +37,209 @@ const SectionHeader = ({ title, section, expandedSections, toggleSection, childr
     )}
   </div>
 );
+
+const InputField = memo(({ 
+  label, 
+  type = 'number', 
+  value, 
+  onChange, 
+  min, 
+  max, 
+  step,
+  help,
+  fieldKey,
+  disabled,
+  touched,
+  fieldErrors,
+  fieldWarnings
+}: {
+  label: string;
+  type?: string;
+  value: string | number;
+  onChange: (value: string | number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  help?: string;
+  fieldKey?: keyof SimulationParameters;
+  disabled?: boolean;
+  touched: Record<string, boolean>;
+  fieldErrors: Record<string, string>;
+  fieldWarnings: Record<string, string>;
+}) => {
+  const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
+  const hasWarning = fieldKey && fieldWarnings[fieldKey];
+  const borderColor = hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 
+                     hasWarning ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500' :
+                     'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
+  
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+        {hasError && <span className="text-red-500 ml-1">*</span>}
+        {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none disabled:opacity-50 ${borderColor}`}
+      />
+      {hasError && (
+        <p className="text-xs text-red-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldErrors[fieldKey!]}
+        </p>
+      )}
+      {hasWarning && !hasError && (
+        <p className="text-xs text-yellow-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldWarnings[fieldKey!]}
+        </p>
+      )}
+      {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
+    </div>
+  );
+});
+
+const CheckboxField = ({ 
+  label, 
+  checked, 
+  onChange, 
+  help,
+  fieldKey,
+  disabled,
+  touched,
+  fieldErrors,
+  fieldWarnings
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  help?: string;
+  fieldKey?: keyof SimulationParameters;
+  disabled?: boolean;
+  touched: Record<string, boolean>;
+  fieldErrors: Record<string, string>;
+  fieldWarnings: Record<string, string>;
+}) => {
+  const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
+  const hasWarning = fieldKey && fieldWarnings[fieldKey];
+  
+  return (
+    <div>
+      <label className="flex items-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          disabled={disabled}
+          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
+        />
+        <span className="ml-2 text-sm font-medium text-gray-700">
+          {label}
+          {hasError && <span className="text-red-500 ml-1">*</span>}
+          {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
+        </span>
+      </label>
+      {hasError && (
+        <p className="text-xs text-red-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldErrors[fieldKey!]}
+        </p>
+      )}
+      {hasWarning && !hasError && (
+        <p className="text-xs text-yellow-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldWarnings[fieldKey!]}
+        </p>
+      )}
+      {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
+    </div>
+  );
+};
+
+const SelectField = ({ 
+  label, 
+  value, 
+  options, 
+  onChange, 
+  help,
+  fieldKey,
+  disabled,
+  touched,
+  fieldErrors,
+  fieldWarnings
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+  help?: string;
+  fieldKey?: keyof SimulationParameters;
+  disabled?: boolean;
+  touched: Record<string, boolean>;
+  fieldErrors: Record<string, string>;
+  fieldWarnings: Record<string, string>;
+}) => {
+  const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
+  const hasWarning = fieldKey && fieldWarnings[fieldKey];
+  const borderColor = hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 
+                     hasWarning ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500' :
+                     'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
+  
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+        {hasError && <span className="text-red-500 ml-1">*</span>}
+        {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none disabled:opacity-50 ${borderColor}`}
+      >
+        {options.map(option => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hasError && (
+        <p className="text-xs text-red-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldErrors[fieldKey!]}
+        </p>
+      )}
+      {hasWarning && !hasError && (
+        <p className="text-xs text-yellow-600 mt-1 flex items-center">
+          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {fieldWarnings[fieldKey!]}
+        </p>
+      )}
+      {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
+    </div>
+  );
+};
 
 export default function ParameterForm({ onSubmit, disabled = false, initialValues = {} }: ParameterFormProps) {
   const [parameters, setParameters] = useState<SimulationParameters>({
@@ -137,184 +340,6 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
   };
 
 
-  const InputField = memo(({ 
-    label, 
-    type = 'number', 
-    value, 
-    onChange, 
-    min, 
-    max, 
-    step,
-    help,
-    fieldKey 
-  }: {
-    label: string;
-    type?: string;
-    value: string | number;
-    onChange: (value: string | number) => void;
-    min?: number;
-    max?: number;
-    step?: number;
-    help?: string;
-    fieldKey?: keyof SimulationParameters;
-  }) => {
-    const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
-    const hasWarning = fieldKey && fieldWarnings[fieldKey];
-    const borderColor = hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 
-                       hasWarning ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500' :
-                       'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
-    
-    return (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-          {hasError && <span className="text-red-500 ml-1">*</span>}
-          {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
-        </label>
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
-          min={min}
-          max={max}
-          step={step}
-          disabled={disabled}
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none disabled:opacity-50 ${borderColor}`}
-        />
-        {hasError && (
-          <p className="text-xs text-red-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldErrors[fieldKey!]}
-          </p>
-        )}
-        {hasWarning && !hasError && (
-          <p className="text-xs text-yellow-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldWarnings[fieldKey!]}
-          </p>
-        )}
-        {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
-      </div>
-    );
-  });
-
-  const CheckboxField = ({ 
-    label, 
-    checked, 
-    onChange, 
-    help,
-    fieldKey 
-  }: {
-    label: string;
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    help?: string;
-    fieldKey?: keyof SimulationParameters;
-  }) => {
-    const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
-    const hasWarning = fieldKey && fieldWarnings[fieldKey];
-    
-    return (
-      <div>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => onChange(e.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
-          />
-          <span className="ml-2 text-sm font-medium text-gray-700">
-            {label}
-            {hasError && <span className="text-red-500 ml-1">*</span>}
-            {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
-          </span>
-        </label>
-        {hasError && (
-          <p className="text-xs text-red-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldErrors[fieldKey!]}
-          </p>
-        )}
-        {hasWarning && !hasError && (
-          <p className="text-xs text-yellow-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldWarnings[fieldKey!]}
-          </p>
-        )}
-        {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
-      </div>
-    );
-  };
-
-  const SelectField = ({ 
-    label, 
-    value, 
-    options, 
-    onChange, 
-    help,
-    fieldKey 
-  }: {
-    label: string;
-    value: string;
-    options: { value: string; label: string }[];
-    onChange: (value: string) => void;
-    help?: string;
-    fieldKey?: keyof SimulationParameters;
-  }) => {
-    const hasError = fieldKey && touched[fieldKey] && fieldErrors[fieldKey];
-    const hasWarning = fieldKey && fieldWarnings[fieldKey];
-    const borderColor = hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 
-                       hasWarning ? 'border-yellow-300 focus:border-yellow-500 focus:ring-yellow-500' :
-                       'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
-    
-    return (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-          {hasError && <span className="text-red-500 ml-1">*</span>}
-          {hasWarning && <span className="text-yellow-500 ml-1">⚠</span>}
-        </label>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none disabled:opacity-50 ${borderColor}`}
-        >
-          {options.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {hasError && (
-          <p className="text-xs text-red-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldErrors[fieldKey!]}
-          </p>
-        )}
-        {hasWarning && !hasError && (
-          <p className="text-xs text-yellow-600 mt-1 flex items-center">
-            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            {fieldWarnings[fieldKey!]}
-          </p>
-        )}
-        {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
-      </div>
-    );
-  };
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6">
@@ -462,19 +487,18 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
         <SectionHeader title="Simulation Parameters" section="simulation" expandedSections={expandedSections} toggleSection={toggleSection}>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Width
-              </label>
-              <input
-                type="number"
-                value={parameters.width}
-                onChange={(e) => updateParameter('width', parseFloat(e.target.value) || 0)}
-                min={10}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">Grid width in pixels</p>
-            </div>
+            <InputField
+              label="Width"
+              value={parameters.width}
+              onChange={onWidthChange}
+              min={10}
+              help="Grid width in pixels"
+              fieldKey="width"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
+            />
             <InputField
               label="Height"
               value={parameters.height}
@@ -482,6 +506,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={10}
               help="Grid height in pixels"
               fieldKey="height"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Actors"
@@ -490,6 +518,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={1}
               help="Number of Physarum actors"
               fieldKey="actors"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Steps"
@@ -498,6 +530,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={1}
               help="Number of simulation steps"
               fieldKey="steps"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Decay Rate"
@@ -508,6 +544,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               step={0.001}
               help="Trail decay rate (0.0-1.0)"
               fieldKey="decay"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="View Radius"
@@ -516,6 +556,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={0}
               help="Actor sensing radius"
               fieldKey="viewRadius"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="View Distance"
@@ -524,6 +568,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={0}
               help="Actor sensing distance"
               fieldKey="viewDistance"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Speed"
@@ -533,6 +581,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               step={0.1}
               help="Actor movement speed"
               fieldKey="speed"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Diffusion Rate"
@@ -543,6 +595,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               step={0.01}
               help="Pheromone diffusion rate"
               fieldKey="diffusionRate"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
           </div>
         </SectionHeader>
@@ -556,6 +612,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               onChange={(value) => updateParameter('smooth', value)}
               help="Generate smooth surfaces instead of voxel-based models"
               fieldKey="smooth"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -567,6 +627,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                 step={0.1}
                 help="Height of each layer in 3D model"
                 fieldKey="layerHeight"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
               <InputField
                 label="Threshold"
@@ -577,6 +641,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                 step={0.01}
                 help="Minimum trail strength for 3D inclusion"
                 fieldKey="threshold"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
               <InputField
                 label="Layer Frequency"
@@ -585,6 +653,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                 min={1}
                 help="Capture layer every N steps"
                 fieldKey="layerFrequency"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
             </div>
 
@@ -598,6 +670,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                     onChange={(value) => updateParameter('smoothingIterations', value)}
                     min={0}
                     help="Number of smoothing iterations"
+                    disabled={disabled}
+                    touched={touched}
+                    fieldErrors={fieldErrors}
+                    fieldWarnings={fieldWarnings}
                   />
                   <SelectField
                     label="Smoothing Type"
@@ -610,6 +686,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                     ]}
                     onChange={(value) => updateParameter('smoothingType', value as 'laplacian' | 'taubin' | 'feature_preserving' | 'boundary_outline')}
                     help="Type of smoothing algorithm"
+                    disabled={disabled}
+                    touched={touched}
+                    fieldErrors={fieldErrors}
+                    fieldWarnings={fieldWarnings}
                   />
                   {parameters.smoothingType === 'taubin' && (
                     <>
@@ -621,6 +701,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         max={0.99}
                         step={0.01}
                         help="Taubin smoothing lambda parameter"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                       <InputField
                         label="Taubin Mu"
@@ -630,6 +714,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         max={-0.01}
                         step={0.01}
                         help="Taubin smoothing mu parameter"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                     </>
                   )}
@@ -640,6 +728,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         checked={parameters.preserveFeatures}
                         onChange={(value) => updateParameter('preserveFeatures', value)}
                         help="Preserve sharp features during smoothing"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                       <InputField
                         label="Feature Angle"
@@ -648,6 +740,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         min={1}
                         max={179}
                         help="Feature edge angle threshold in degrees"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                     </>
                   )}
@@ -657,6 +753,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                   checked={parameters.meshQuality}
                   onChange={(value) => updateParameter('meshQuality', value)}
                   help="Display detailed mesh quality information"
+                  disabled={disabled}
+                  touched={touched}
+                  fieldErrors={fieldErrors}
+                  fieldWarnings={fieldWarnings}
                 />
               </div>
             )}
@@ -668,6 +768,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                 checked={parameters.background}
                 onChange={(value) => updateParameter('background', value)}
                 help="Add a solid rectangular background behind the simulation"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
               {parameters.background && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -678,6 +782,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                     min={0.1}
                     step={0.1}
                     help="Depth/thickness of the background layer"
+                    disabled={disabled}
+                    touched={touched}
+                    fieldErrors={fieldErrors}
+                    fieldWarnings={fieldWarnings}
                   />
                   <InputField
                     label="Background Margin"
@@ -687,12 +795,20 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                     max={1}
                     step={0.01}
                     help="Background margin as fraction of simulation bounds"
+                    disabled={disabled}
+                    touched={touched}
+                    fieldErrors={fieldErrors}
+                    fieldWarnings={fieldWarnings}
                   />
                   <CheckboxField
                     label="Add Border"
                     checked={parameters.backgroundBorder}
                     onChange={(value) => updateParameter('backgroundBorder', value)}
                     help="Add a raised border around the background edges"
+                    disabled={disabled}
+                    touched={touched}
+                    fieldErrors={fieldErrors}
+                    fieldWarnings={fieldWarnings}
                   />
                   {parameters.backgroundBorder && (
                     <>
@@ -703,6 +819,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         min={0.1}
                         step={0.1}
                         help="Height of the border walls above the background"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                       <InputField
                         label="Border Thickness"
@@ -711,6 +831,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                         min={0.1}
                         step={0.1}
                         help="Thickness of the border walls"
+                        disabled={disabled}
+                        touched={touched}
+                        fieldErrors={fieldErrors}
+                        fieldWarnings={fieldWarnings}
                       />
                     </>
                   )}
@@ -730,6 +854,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               onChange={(value) => updateParameter('output', value)}
               help="Output STL filename (must end with .stl)"
               fieldKey="output"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <div className="space-y-2">
               <CheckboxField
@@ -737,12 +865,20 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
                 checked={parameters.verbose}
                 onChange={(value) => updateParameter('verbose', value)}
                 help="Show detailed progress information"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
               <CheckboxField
                 label="Quiet Mode"
                 checked={parameters.quiet}
                 onChange={(value) => updateParameter('quiet', value)}
                 help="Suppress progress output"
+                disabled={disabled}
+                touched={touched}
+                fieldErrors={fieldErrors}
+                fieldWarnings={fieldWarnings}
               />
             </div>
           </div>
@@ -758,6 +894,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={0}
               step={0.1}
               help="Minimum speed for initial actors"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Speed Max"
@@ -766,6 +906,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={0}
               step={0.1}
               help="Maximum speed for initial actors"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Spawn Speed Randomization"
@@ -775,6 +919,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               max={1}
               step={0.01}
               help="Factor for randomizing spawned actor speeds"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Initial Diameter"
@@ -783,6 +931,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               min={1}
               step={0.1}
               help="Initial circle diameter for actor placement"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Death Probability"
@@ -792,6 +944,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               max={1}
               step={0.001}
               help="Age-based death probability per step"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Spawn Probability"
@@ -801,6 +957,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               max={1}
               step={0.001}
               help="Probability of spawning new actors"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
             <InputField
               label="Direction Deviation"
@@ -810,6 +970,10 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
               max={3.14159}
               step={0.01}
               help="Maximum direction deviation in radians"
+              disabled={disabled}
+              touched={touched}
+              fieldErrors={fieldErrors}
+              fieldWarnings={fieldWarnings}
             />
           </div>
         </SectionHeader>
