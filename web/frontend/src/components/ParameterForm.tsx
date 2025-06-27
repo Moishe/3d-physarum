@@ -1,7 +1,7 @@
 // ABOUTME: Main form component for simulation parameters organized in collapsible sections
 // ABOUTME: Handles form validation, presets, and parameter submission to the simulation API
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import type { SimulationParameters, ParameterPreset } from '../types/simulation';
 import { DEFAULT_PARAMETERS, PRESET_CATEGORIES } from '../types/simulation';
 import { validateField, validateParameters, estimateSimulationTime } from '../utils/validation';
@@ -11,6 +11,32 @@ interface ParameterFormProps {
   disabled?: boolean;
   initialValues?: Partial<SimulationParameters>;
 }
+
+const SectionHeader = ({ title, section, expandedSections, toggleSection, children }: { 
+  title: string; 
+  section: string;
+  expandedSections: Record<string, boolean>;
+  toggleSection: (section: string) => void;
+  children: React.ReactNode;
+}) => (
+  <div className="border border-gray-200 rounded-lg mb-4">
+    <button
+      type="button"
+      onClick={() => toggleSection(section)}
+      className="w-full px-4 py-3 text-left font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-t-lg flex justify-between items-center"
+    >
+      {title}
+      <span className={`transform transition-transform ${expandedSections[section] ? 'rotate-180' : ''}`}>
+        ▼
+      </span>
+    </button>
+    {expandedSections[section] && (
+      <div className="p-4 space-y-4">
+        {children}
+      </div>
+    )}
+  </div>
+);
 
 export default function ParameterForm({ onSubmit, disabled = false, initialValues = {} }: ParameterFormProps) {
   const [parameters, setParameters] = useState<SimulationParameters>({
@@ -62,34 +88,33 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
   };
 
   const updateParameter = useCallback((key: keyof SimulationParameters, value: SimulationParameters[keyof SimulationParameters]) => {
-    // Batch all state updates to prevent multiple re-renders
-    setParameters(prev => {
-      const newParams = { ...prev, [key]: value };
-      
-      // Validate individual field
-      const error = validateField(key, value);
-      
-      // Update touched state
-      setTouched(prevTouched => ({ ...prevTouched, [key]: true }));
-      
-      // Update field errors
-      setFieldErrors(prevErrors => {
-        const newErrors = { ...prevErrors };
-        if (error) {
-          newErrors[key] = error;
-        } else {
-          delete newErrors[key];
-        }
-        return newErrors;
-      });
-      
-      // Re-validate entire form for cross-field validation (synchronously)
-      const validation = validateParameters(newParams);
-      setFieldWarnings(validation.warnings);
-      
-      return newParams;
+    // Update parameters immediately
+    const newParams = { ...parameters, [key]: value };
+    
+    // Validate individual field
+    const error = validateField(key, value);
+    
+    // Re-validate entire form for cross-field validation
+    const validation = validateParameters(newParams);
+    
+    // Batch ALL state updates into a single React update cycle
+    setParameters(newParams);
+    setTouched(prevTouched => ({ ...prevTouched, [key]: true }));
+    setFieldErrors(prevErrors => {
+      const newErrors = { ...prevErrors };
+      if (error) {
+        newErrors[key] = error;
+      } else {
+        delete newErrors[key];
+      }
+      return newErrors;
     });
-  }, []);
+    setFieldWarnings(validation.warnings);
+  }, [parameters]);
+
+  // Create stable onChange handlers for each field
+  const onWidthChange = useCallback((value: string | number) => updateParameter('width', value), [updateParameter]);
+  const onHeightChange = useCallback((value: string | number) => updateParameter('height', value), [updateParameter]);
 
   const applyPreset = useCallback((preset: ParameterPreset) => {
     const newParams = { ...parameters, ...preset.parameters };
@@ -111,31 +136,8 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const SectionHeader = ({ title, section, children }: { 
-    title: string; 
-    section: keyof typeof expandedSections;
-    children: React.ReactNode;
-  }) => (
-    <div className="border border-gray-200 rounded-lg mb-4">
-      <button
-        type="button"
-        onClick={() => toggleSection(section)}
-        className="w-full px-4 py-3 text-left font-medium text-gray-900 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-t-lg flex justify-between items-center"
-      >
-        {title}
-        <span className={`transform transition-transform ${expandedSections[section] ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
-      </button>
-      {expandedSections[section] && (
-        <div className="p-4 space-y-4">
-          {children}
-        </div>
-      )}
-    </div>
-  );
 
-  const InputField = ({ 
+  const InputField = memo(({ 
     label, 
     type = 'number', 
     value, 
@@ -198,7 +200,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
         {help && !hasError && !hasWarning && <p className="text-xs text-gray-500 mt-1">{help}</p>}
       </div>
     );
-  };
+  });
 
   const CheckboxField = ({ 
     label, 
@@ -316,6 +318,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6">
+
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Physarum 3D Model Parameters</h2>
         <p className="text-gray-600">Configure simulation parameters to generate your 3D model</p>
@@ -454,21 +457,28 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+
         {/* Simulation Parameters */}
-        <SectionHeader title="Simulation Parameters" section="simulation">
+        <SectionHeader title="Simulation Parameters" section="simulation" expandedSections={expandedSections} toggleSection={toggleSection}>
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <InputField
-              label="Width"
-              value={parameters.width}
-              onChange={(value) => updateParameter('width', value)}
-              min={10}
-              help="Grid width in pixels"
-              fieldKey="width"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Width
+              </label>
+              <input
+                type="number"
+                value={parameters.width}
+                onChange={(e) => updateParameter('width', parseFloat(e.target.value) || 0)}
+                min={10}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Grid width in pixels</p>
+            </div>
             <InputField
               label="Height"
               value={parameters.height}
-              onChange={(value) => updateParameter('height', value)}
+              onChange={onHeightChange}
               min={10}
               help="Grid height in pixels"
               fieldKey="height"
@@ -538,7 +548,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
         </SectionHeader>
 
         {/* 3D Model Parameters */}
-        <SectionHeader title="3D Model Parameters" section="model3d">
+        <SectionHeader title="3D Model Parameters" section="model3d" expandedSections={expandedSections} toggleSection={toggleSection}>
           <div className="space-y-4">
             <CheckboxField
               label="Use Smooth Surfaces (Marching Cubes)"
@@ -711,7 +721,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
         </SectionHeader>
 
         {/* Output Parameters */}
-        <SectionHeader title="Output Parameters" section="output">
+        <SectionHeader title="Output Parameters" section="output" expandedSections={expandedSections} toggleSection={toggleSection}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <InputField
               label="Output Filename"
@@ -739,7 +749,7 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
         </SectionHeader>
 
         {/* Advanced Parameters */}
-        <SectionHeader title="Advanced Parameters" section="advanced">
+        <SectionHeader title="Advanced Parameters" section="advanced" expandedSections={expandedSections} toggleSection={toggleSection}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <InputField
               label="Speed Min"
