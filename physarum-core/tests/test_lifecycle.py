@@ -4,7 +4,7 @@
 import unittest
 import math
 import random
-from physarum import PhysarumSimulation, PhysarumActor
+from physarum_core.simulation import PhysarumSimulation, PhysarumActor
 
 
 class TestLifecycleFunctionality(unittest.TestCase):

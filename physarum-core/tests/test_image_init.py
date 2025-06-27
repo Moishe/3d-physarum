@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 import tempfile
 import os
-from physarum import PhysarumSimulation
+from physarum_core.simulation import PhysarumSimulation
 
 
 class TestImageInitialization:

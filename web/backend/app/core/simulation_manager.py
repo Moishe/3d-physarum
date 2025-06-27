@@ -234,21 +234,12 @@ class SimulationManager:
         job = self.jobs[job_id]
         
         try:
-            # Import simulation modules (lazy import to avoid circular dependencies)
-            import sys
-            import os
-            
-            # Add parent directories to path to import main simulation code
-            backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            project_root = os.path.dirname(os.path.dirname(backend_dir))
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
-            
-            from physarum import PhysarumSimulation
-            from model_3d import Model3DGenerator
-            from model_3d_smooth import SmoothModel3DGenerator
-            from output_manager import OutputManager
-            from preview_generator import PreviewGenerator
+            # Import simulation modules from physarum-core package
+            from physarum_core.simulation import PhysarumSimulation
+            from physarum_core.models.model_3d import Model3DGenerator
+            from physarum_core.models.model_3d_smooth import SmoothModel3DGenerator
+            from physarum_core.output.manager import OutputManager
+            from physarum_core.preview.generator import PreviewGenerator
             from .parameter_adapter import ParameterAdapter
             import numpy as np
             

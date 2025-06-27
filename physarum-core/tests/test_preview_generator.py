@@ -8,7 +8,7 @@ import shutil
 import numpy as np
 from PIL import Image
 from unittest.mock import Mock
-from preview_generator import PreviewGenerator
+from physarum_core.preview.generator import PreviewGenerator
 
 
 class TestPreviewGenerator(unittest.TestCase):
