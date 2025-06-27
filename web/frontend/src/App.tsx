@@ -224,7 +224,6 @@ function App() {
             onSubmit={startSimulation}
             disabled={isSimulating}
             initialValues={formParameters}
-            key={JSON.stringify(formParameters)} // Force re-render when parameters change
           />
         )}
 

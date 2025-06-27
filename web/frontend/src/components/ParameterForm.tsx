@@ -1,7 +1,7 @@
 // ABOUTME: Main form component for simulation parameters organized in collapsible sections
 // ABOUTME: Handles form validation, presets, and parameter submission to the simulation API
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { SimulationParameters, ParameterPreset } from '../types/simulation';
 import { DEFAULT_PARAMETERS, PRESET_CATEGORIES } from '../types/simulation';
 import { validateField, validateParameters, estimateSimulationTime } from '../utils/validation';
@@ -21,6 +21,13 @@ export default function ParameterForm({ onSubmit, disabled = false, initialValue
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [fieldWarnings, setFieldWarnings] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  
+  // Update parameters when initialValues change (e.g., from loading history)
+  useEffect(() => {
+    if (Object.keys(initialValues).length > 0) {
+      setParameters(prev => ({ ...prev, ...initialValues }));
+    }
+  }, [initialValues]);
   
   // Performance estimation
   const performanceEstimate = useMemo(() => {
