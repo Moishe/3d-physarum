@@ -66,7 +66,7 @@ export default function ResultsDisplay({ result, onNewSimulation }: ResultsDispl
               <h4 className="text-md font-medium text-gray-900 mb-3">Preview Image</h4>
               <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center min-h-64">
                 <img
-                  src={result.previewPath}
+                  src={api.getDownloadUrl(result.jobId, 'preview')}
                   alt="3D Model Preview"
                   className="max-w-full max-h-64 rounded-lg shadow-sm"
                   onError={(e) => {

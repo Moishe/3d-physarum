@@ -143,7 +143,7 @@ function convertResultToFrontend(apiResult: ApiResultResponse): SimulationResult
     jobId: apiResult.job_id,
     stlPath: `/api/simulate/${apiResult.job_id}/download/stl`,
     jsonPath: `/api/simulate/${apiResult.job_id}/download/json`,
-    previewPath: `${API_BASE_URL}/api/simulate/${apiResult.job_id}/download/preview`,
+    previewPath: `/api/simulate/${apiResult.job_id}/download/preview`,
     fileSize: apiResult.file_sizes.stl || 0,
     parameters: apiResult.parameters,
     meshMetrics: apiResult.mesh_quality ? {
