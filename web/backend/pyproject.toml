@@ -17,6 +17,8 @@ dependencies = [
     "scipy>=1.7.0",
     "numpy-stl>=3.0.0",
     "matplotlib>=3.5.0",
+    "scikit-image>=0.20.0",
+    "requests>=2.32.4",
 ]
 
 [project.optional-dependencies]
