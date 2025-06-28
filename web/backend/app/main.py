@@ -28,13 +28,24 @@ app = FastAPI(
 )
 
 # Add CORS middleware for frontend communication
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if settings.CORS_ALLOW_ALL:
+    # Allow all origins (for testing)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # Can't use credentials with allow_origins=["*"]
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Specific origins only
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Global exception handler for unhandled exceptions
 @app.exception_handler(Exception)
@@ -79,6 +90,12 @@ app.include_router(models_router)
 async def startup_event():
     """Initialize the application on startup."""
     logger.info("Starting up application...")
+    
+    # Log CORS configuration for debugging
+    if settings.CORS_ALLOW_ALL:
+        logger.info("CORS: Allowing all origins")
+    else:
+        logger.info(f"CORS: Allowed origins: {settings.ALLOWED_ORIGINS}")
     
     # Ensure output directory exists
     settings.OUTPUT_DIR.mkdir(exist_ok=True)
