@@ -10,7 +10,6 @@ import traceback
 import time
 
 from .api.routes.simulation import router as simulation_router
-from .api.routes.models import router as models_router
 from .core.progress_reporter import progress_reporter
 from .core.model_registry import model_registry
 from .models.responses import HealthResponse
@@ -72,7 +71,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include API routes
 app.include_router(simulation_router)
-app.include_router(models_router)
 
 # Startup event to scan for existing models
 @app.on_event("startup")
