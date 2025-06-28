@@ -7,16 +7,18 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml first for better caching
-COPY pyproject.toml ./
-COPY ../../physarum-core/ ./physarum-core/
+# Install uv first
+RUN pip install uv
+
+# Copy dependencies list
+COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install uv
-RUN uv pip install --system -e .
+RUN uv pip install --system -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
+COPY physarum_core/ ./physarum_core/
 
 # Create output directory
 RUN mkdir -p output
