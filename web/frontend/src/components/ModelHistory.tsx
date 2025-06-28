@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { SimulationResult } from '../types/simulation';
-import { api, type ModelRecord } from '../services/api';
+import { api } from '../services/api';
 
 // Unified history item type that can represent both active jobs and persistent models
 interface HistoryItem {
@@ -142,7 +142,7 @@ const ModelHistory = forwardRef<{ addToHistory: (result: SimulationResult) => vo
     
     // Remove duplicate if exists and add new item
     const filtered = existingHistory.filter((item: any) => item.jobId !== result.jobId);
-    const newHistory = [result, ...filtered].slice(0, 20);
+    const newHistory = [historyItem, ...filtered].slice(0, 20);
     localStorage.setItem('physarum-download-history', JSON.stringify(newHistory));
     
     // Reload the unified history
