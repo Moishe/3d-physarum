@@ -12,11 +12,11 @@ RUN pip install uv
 
 # Copy workspace configuration files
 COPY pyproject.toml uv.lock ./
-COPY web/backend/pyproject.toml web/backend/uv.lock ./web/backend/
+COPY web/backend/pyproject.toml ./web/backend/
 COPY physarum-core/pyproject.toml physarum-core/uv.lock ./physarum-core/
 
 # Copy physarum_core source code (needed for workspace dependency)
-COPY web/backend/physarum_core/ ./physarum_core/
+COPY physarum-core/physarum_core/ ./physarum_core/
 
 # Copy application code
 COPY web/backend/app/ ./app/
