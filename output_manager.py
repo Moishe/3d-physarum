@@ -5,6 +5,7 @@ import os
 import json
 import sys
 import subprocess
+import time
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 
@@ -174,4 +175,101 @@ class OutputManager:
         # Create sidecar JSON
         self.create_sidecar_json(json_path, args, command_line)
         
+        # Optionally register with model registry if available
+        self._register_with_model_registry(stl_path, json_path, jpg_path, args, command_line)
+        
         return stl_path, json_path, jpg_path
+    
+    def _register_with_model_registry(self, stl_path: str, json_path: str, jpg_path: str, 
+                                    args: Any, command_line: str) -> None:
+        """Optionally register the model with the persistent model registry.
+        
+        This will only work if the web backend's model registry is accessible.
+        Fails gracefully if not available.
+        
+        Args:
+            stl_path: Path to the STL file
+            json_path: Path to the JSON metadata file
+            jpg_path: Path to the preview image file
+            args: The parsed arguments object
+            command_line: The original command line used
+        """
+        try:
+            # Only attempt registration if the web backend module is available
+            import sys
+            web_backend_path = os.path.join(os.path.dirname(__file__), 'web', 'backend')
+            if os.path.exists(web_backend_path):
+                sys.path.insert(0, web_backend_path)
+                
+                from app.core.model_registry import model_registry, ModelRecord
+                
+                # Generate model ID
+                model_id = self._generate_model_id_for_registry(json_path, stl_path)
+                
+                # Convert args to dictionary
+                parameters = {}
+                for key, value in vars(args).items():
+                    parameters[key] = value
+                
+                # Get git information
+                git_hash = self.get_git_commit_hash()
+                
+                # Get file sizes
+                file_sizes = {}
+                for file_type, file_path in [('stl', stl_path), ('json', json_path), ('jpg', jpg_path)]:
+                    if file_path and os.path.exists(file_path):
+                        file_sizes[file_type] = os.path.getsize(file_path)
+                
+                # Determine model name
+                name = "CLI Generated Model"
+                if hasattr(args, 'output') and args.output:
+                    name = os.path.splitext(os.path.basename(args.output))[0]
+                
+                # Create model record
+                model_record = ModelRecord(
+                    id=model_id,
+                    created_at=time.time(),
+                    name=name,
+                    stl_path=stl_path,
+                    json_path=json_path,
+                    jpg_path=jpg_path if os.path.exists(jpg_path) else None,
+                    parameters=parameters,
+                    source='cli',
+                    git_commit=git_hash,
+                    file_sizes=file_sizes,
+                    favorite=False,
+                    tags=''
+                )
+                
+                # Register the model
+                success = model_registry.register_model(model_record)
+                if success:
+                    print(f"✓ Model registered in persistent history: {model_id}")
+                else:
+                    print("⚠ Failed to register model in persistent history")
+                    
+        except ImportError:
+            # Web backend not available, skip registration
+            pass
+        except Exception as e:
+            # Registry not accessible or other error, fail silently
+            print(f"⚠ Could not register model in persistent history: {e}")
+    
+    def _generate_model_id_for_registry(self, json_path: str, stl_path: str) -> str:
+        """Generate a model ID for the registry."""
+        import hashlib
+        import time
+        
+        if json_path and os.path.exists(json_path):
+            # Use hash of JSON file content for deterministic IDs
+            with open(json_path, 'r') as f:
+                content = f.read()
+            hash_obj = hashlib.md5(content.encode())
+            return f"cli_{hash_obj.hexdigest()[:12]}"
+        elif stl_path:
+            # Use filename-based ID
+            base_name = os.path.splitext(os.path.basename(stl_path))[0]
+            return f"cli_{base_name}_{int(time.time())}"
+        else:
+            # Fallback to timestamp
+            return f"cli_{int(time.time())}"

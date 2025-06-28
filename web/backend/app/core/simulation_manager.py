@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from ..models.simulation import SimulationStatus, SimulationParameters, ProgressUpdate, MeshQualityMetrics
+from .model_registry import model_registry, ModelRecord
 
 
 logger = logging.getLogger(__name__)
@@ -428,6 +429,32 @@ class SimulationManager:
             # Mark as completed
             job.status = SimulationStatus.completed
             job.completed_at = time.time()
+            
+            # Register model in persistent registry
+            try:
+                model_record = ModelRecord(
+                    id=job_id,
+                    created_at=job.completed_at,
+                    name=job.parameters.output or f"Model {job_id[:8]}",
+                    stl_path=job.result_files.get('stl'),
+                    json_path=job.result_files.get('json'),
+                    jpg_path=job.result_files.get('jpg'),
+                    parameters=job.parameters.__dict__,
+                    source='web',
+                    git_commit=None,  # Web-generated models don't have git commits
+                    file_sizes=job.file_sizes,
+                    favorite=False,
+                    tags=''
+                )
+                
+                success = model_registry.register_model(model_record)
+                if success:
+                    logger.info(f"Registered model {job_id} in persistent registry")
+                else:
+                    logger.warning(f"Failed to register model {job_id} in persistent registry")
+                    
+            except Exception as e:
+                logger.error(f"Error registering model {job_id} in registry: {e}")
             
             logger.info(f"Simulation {job_id} completed successfully")
             

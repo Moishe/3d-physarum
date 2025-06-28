@@ -3,6 +3,34 @@
 
 import type { SimulationParameters, SimulationStatus, SimulationResult } from '../types/simulation';
 
+// Model registry types
+interface ModelRecord {
+  id: string;
+  created_at: number;
+  name: string;
+  stl_path?: string;
+  json_path?: string;
+  jpg_path?: string;
+  parameters: Record<string, any>;
+  source: 'cli' | 'web' | 'unknown';
+  git_commit?: string;
+  file_sizes: Record<string, number>;
+  favorite: boolean;
+  tags: string[];
+}
+
+interface ModelListResponse {
+  success: boolean;
+  data: {
+    models: ModelRecord[];
+    total_count: number;
+    returned_count: number;
+    offset: number;
+    has_more: boolean;
+  };
+  statistics: Record<string, any>;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // API response types that match the backend
@@ -236,6 +264,69 @@ export const api = {
   getDownloadUrl(jobId: string, fileType: 'stl' | 'json' | 'preview'): string {
     return `${API_BASE_URL}/api/simulate/${jobId}/download/${fileType}`;
   },
+
+  // Model registry API functions
+  
+  // List models with optional filtering
+  async listModels(options?: {
+    source?: 'cli' | 'web';
+    favorites?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<ModelListResponse> {
+    const params = new URLSearchParams();
+    
+    if (options?.source) params.append('source', options.source);
+    if (options?.favorites) params.append('favorites', 'true');
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.offset) params.append('offset', options.offset.toString());
+    
+    const endpoint = `/api/models/?${params.toString()}`;
+    return await makeRequest<ModelListResponse>(endpoint);
+  },
+
+  // Get specific model details
+  async getModel(modelId: string): Promise<{ success: boolean; data: ModelRecord }> {
+    return await makeRequest<{ success: boolean; data: ModelRecord }>(`/api/models/${modelId}`);
+  },
+
+  // Update model metadata
+  async updateModel(modelId: string, updates: {
+    name?: string;
+    favorite?: boolean;
+    tags?: string[];
+  }): Promise<{ success: boolean; message: string }> {
+    return await makeRequest<{ success: boolean; message: string }>(`/api/models/${modelId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  // Delete model
+  async deleteModel(modelId: string, deleteFiles = false): Promise<{ success: boolean; message: string }> {
+    const params = deleteFiles ? '?delete_files=true' : '';
+    return await makeRequest<{ success: boolean; message: string }>(`/api/models/${modelId}${params}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Trigger model scan
+  async scanModels(): Promise<{ success: boolean; message: string }> {
+    return await makeRequest<{ success: boolean; message: string }>('/api/models/scan', {
+      method: 'POST',
+    });
+  },
+
+  // Get model statistics
+  async getModelStatistics(): Promise<{ success: boolean; data: Record<string, any> }> {
+    return await makeRequest<{ success: boolean; data: Record<string, any> }>('/api/models/statistics');
+  },
+
+  // Get model download URL
+  getModelDownloadUrl(modelId: string, fileType: 'stl' | 'json' | 'jpg' | 'preview'): string {
+    return `${API_BASE_URL}/api/models/${modelId}/download/${fileType}`;
+  },
 };
 
 export { ApiError };
+export type { ModelRecord, ModelListResponse };
