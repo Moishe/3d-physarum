@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /workspace
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -10,15 +10,15 @@ RUN apt-get update && apt-get install -y \
 # Install uv first
 RUN pip install uv
 
-# Copy project configuration
-COPY pyproject.toml .
+# Copy entire workspace for proper dependency resolution
+COPY . .
 
-# Install Python dependencies
+# Install physarum-core first
+RUN uv pip install --system -e ./physarum-core/
+
+# Install backend with its dependencies
+WORKDIR /workspace/web/backend
 RUN uv pip install --system -e .
-
-# Copy application code
-COPY app/ ./app/
-COPY physarum_core/ ./physarum_core/
 
 # Create output directory
 RUN mkdir -p output

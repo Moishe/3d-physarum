@@ -4,6 +4,7 @@ version = "1.0.0"
 description = "Backend API for 3D Physarum model generator web application"
 requires-python = ">=3.9"
 dependencies = [
+    "physarum-core",
     "fastapi>=0.115.14",
     "uvicorn[standard]>=0.34.3",
     "websockets>=15.0.1",
@@ -11,13 +12,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "psutil>=5.9.0",
     "httpx>=0.24.0",
-    "numpy>=1.21.0",
-    "pillow>=8.0.0",
-    "trimesh>=3.9.0",
-    "scipy>=1.7.0",
-    "numpy-stl>=3.0.0",
     "matplotlib>=3.5.0",
-    "scikit-image>=0.20.0",
     "requests>=2.32.4",
 ]
 
@@ -44,4 +39,7 @@ dev-dependencies = [
     "pytest-asyncio>=0.21.0",
     "httpx>=0.24.0",
 ]
+
+[tool.uv.sources]
+physarum-core = { workspace = true }
 

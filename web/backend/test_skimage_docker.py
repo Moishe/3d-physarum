@@ -29,10 +29,11 @@ class SkimageDockerTest:
             subprocess.run(["docker", "stop", self.container_name], capture_output=True)
             subprocess.run(["docker", "rm", self.container_name], capture_output=True)
             
-            # Build image
+            # Build image from workspace root
             result = subprocess.run(
-                ["docker", "build", "-t", "physarum-backend", "."],
-                capture_output=True, text=True, timeout=300
+                ["docker", "build", "-f", "web/backend/Dockerfile", "-t", "physarum-backend", "."],
+                capture_output=True, text=True, timeout=300,
+                cwd="/Users/moishe/src/3d-physarum"  # Change to workspace root
             )
             if result.returncode != 0:
                 print(f"❌ Build failed: {result.stderr}")
