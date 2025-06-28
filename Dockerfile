@@ -16,7 +16,7 @@ COPY web/backend/pyproject.toml ./web/backend/
 COPY physarum-core/pyproject.toml physarum-core/uv.lock ./physarum-core/
 
 # Copy physarum_core source code (needed for workspace dependency)
-COPY physarum-core/physarum_core/ ./physarum_core/
+COPY physarum-core/physarum_core/ ./physarum-core/physarum_core/
 
 # Copy application code
 COPY web/backend/app/ ./web/backend/app/
