@@ -31,7 +31,7 @@ interface ModelListResponse {
   statistics: Record<string, any>;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // API response types that match the backend
 interface ApiSimulationResponse {
