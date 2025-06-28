@@ -18,6 +18,10 @@ COPY physarum-core/pyproject.toml physarum-core/uv.lock ./physarum-core/
 # Copy physarum_core source code (needed for workspace dependency)
 COPY physarum-core/physarum_core/ ./physarum-core/physarum_core/
 
+# Fix permissions on physarum_core files to ensure they're readable
+RUN chmod -R 755 ./physarum-core/physarum_core/ && \
+    find ./physarum-core/physarum_core/ -type f -name "*.py" -exec chmod 644 {} \;
+
 # Copy application code
 COPY web/backend/app/ ./web/backend/app/
 
