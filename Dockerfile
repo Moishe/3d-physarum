@@ -19,7 +19,7 @@ COPY physarum-core/pyproject.toml physarum-core/uv.lock ./physarum-core/
 COPY physarum-core/physarum_core/ ./physarum_core/
 
 # Copy application code
-COPY web/backend/app/ ./app/
+COPY web/backend/app/ ./web/backend/app/
 
 # Use uv to install all dependencies from pyproject.toml in the backend directory
 WORKDIR /app/web/backend
