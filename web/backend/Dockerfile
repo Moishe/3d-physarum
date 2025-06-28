@@ -10,11 +10,11 @@ RUN apt-get update && apt-get install -y \
 # Install uv first
 RUN pip install uv
 
-# Copy dependencies list
-COPY requirements.txt .
+# Copy project configuration
+COPY pyproject.toml .
 
 # Install Python dependencies
-RUN uv pip install --system -r requirements.txt
+RUN uv pip install --system -e .
 
 # Copy application code
 COPY app/ ./app/
