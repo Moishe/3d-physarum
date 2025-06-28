@@ -10,8 +10,11 @@ import traceback
 import time
 
 from .api.routes.simulation import router as simulation_router
+from .api.routes.models import router as models_router
 from .core.progress_reporter import progress_reporter
+from .core.model_registry import model_registry
 from .models.responses import HealthResponse
+from .config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +30,7 @@ app = FastAPI(
 # Add CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +72,25 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include API routes
 app.include_router(simulation_router)
+app.include_router(models_router)
+
+# Startup event to scan for existing models
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the application on startup."""
+    logger.info("Starting up application...")
+    
+    # Ensure output directory exists
+    settings.OUTPUT_DIR.mkdir(exist_ok=True)
+    
+    # Scan for existing models in output directory
+    try:
+        registered_count = model_registry.scan_and_register_models()
+        logger.info(f"Startup scan complete. Found {registered_count} models.")
+    except Exception as e:
+        logger.error(f"Failed to scan models on startup: {e}")
+    
+    logger.info("Application startup complete.")
 
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
