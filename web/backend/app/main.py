@@ -92,24 +92,6 @@ async def startup_event():
     
     logger.info("Application startup complete.")
 
-# Startup event to scan for existing models
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the application on startup."""
-    logger.info("Starting up application...")
-    
-    # Ensure output directory exists
-    settings.OUTPUT_DIR.mkdir(exist_ok=True)
-    
-    # Scan for existing models in output directory
-    try:
-        registered_count = model_registry.scan_and_register_models()
-        logger.info(f"Startup scan complete. Found {registered_count} models.")
-    except Exception as e:
-        logger.error(f"Failed to scan models on startup: {e}")
-    
-    logger.info("Application startup complete.")
-
 # Health check endpoint
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
