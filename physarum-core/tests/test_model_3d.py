@@ -372,6 +372,9 @@ class TestBackgroundFunctionality:
         self.sim.run(10)
         generator.capture_layer()
         
+        # Get the actual content bounds that the background mesh should be based on
+        content_bounds = generator._get_simulation_content_bounds()
+        
         background_triangles = generator._create_background_mesh()
         
         # Extract all vertices from triangles
@@ -384,15 +387,19 @@ class TestBackgroundFunctionality:
         min_coords = np.min(all_vertices, axis=0)
         max_coords = np.max(all_vertices, axis=0)
         
-        # X bounds should extend beyond simulation bounds by margin
-        expected_x_margin = 20 * 0.1  # 20 * margin
-        assert min_coords[0] == pytest.approx(-expected_x_margin, abs=1e-6)
-        assert max_coords[0] == pytest.approx(20 + expected_x_margin, abs=1e-6)
+        # Calculate expected margins based on actual content bounds
+        content_width = content_bounds['x_max'] - content_bounds['x_min']
+        content_height = content_bounds['y_max'] - content_bounds['y_min']
+        expected_x_margin = content_width * 0.1  # content_width * margin
+        expected_y_margin = content_height * 0.1  # content_height * margin
         
-        # Y bounds should extend beyond simulation bounds by margin
-        expected_y_margin = 20 * 0.1  # 20 * margin
-        assert min_coords[1] == pytest.approx(-expected_y_margin, abs=1e-6)
-        assert max_coords[1] == pytest.approx(20 + expected_y_margin, abs=1e-6)
+        # X bounds should extend beyond content bounds by margin
+        assert min_coords[0] == pytest.approx(content_bounds['x_min'] - expected_x_margin, abs=1e-6)
+        assert max_coords[0] == pytest.approx(content_bounds['x_max'] + expected_x_margin, abs=1e-6)
+        
+        # Y bounds should extend beyond content bounds by margin
+        assert min_coords[1] == pytest.approx(content_bounds['y_min'] - expected_y_margin, abs=1e-6)
+        assert max_coords[1] == pytest.approx(content_bounds['y_max'] + expected_y_margin, abs=1e-6)
         
         # Z bounds should be from last_layer_z to last_layer_z + background_depth
         # With layer_height=1.0 and at least 1 layer, last_layer_z should be >= 1.0

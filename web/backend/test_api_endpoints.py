@@ -50,7 +50,17 @@ class TestAPIEndpoints:
         job = Mock(spec=SimulationJob)
         job.job_id = "test-job-123"
         job.status = SimulationStatus.completed
-        job.progress = {"step": 100, "total_steps": 100, "message": "Complete"}
+        job.progress = {
+            "job_id": "test-job-123",
+            "step": 100,
+            "total_steps": 100,
+            "layers_captured": 5,
+            "actor_count": 50,
+            "max_trail": 0.8,
+            "mean_trail": 0.3,
+            "estimated_completion_time": None,
+            "timestamp": 1234567890.0
+        }
         job.error_message = None
         job.started_at = 1234567890.0
         job.completed_at = 1234567900.0
@@ -66,7 +76,16 @@ class TestAPIEndpoints:
             "jpg": "/tmp/test.jpg"
         }
         job.statistics = {"total_actors": 50, "simulation_time": 10.0}
-        job.mesh_quality = {"vertices": 1000, "faces": 2000}
+        job.mesh_quality = {
+            "vertex_count": 1000,
+            "face_count": 2000,
+            "volume": 125.5,
+            "surface_area": 300.2,
+            "is_watertight": True,
+            "is_winding_consistent": True,
+            "print_ready": True,
+            "issues": []
+        }
         job.file_sizes = {"stl": 1024, "json": 512, "jpg": 2048}
         job.cancel_requested = False
         return job

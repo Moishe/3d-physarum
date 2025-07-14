@@ -15,7 +15,7 @@ def test_physarum_core_imports():
         print("✓ physarum_core basic import successful")
     except ImportError as e:
         print(f"✗ physarum_core basic import failed: {e}")
-        return False
+        assert False, f"physarum_core basic import failed: {e}"
     
     # Test physarum_core.output import (this is where the error occurs)
     try:
@@ -23,15 +23,15 @@ def test_physarum_core_imports():
         print("✓ physarum_core.output.OutputManager import successful")
     except ImportError as e:
         print(f"✗ physarum_core.output.OutputManager import failed: {e}")
-        return False
+        assert False, f"physarum_core.output.OutputManager import failed: {e}"
     
     # Test physarum_core.models import
     try:
-        from physarum_core.models.model_3d import Model3D
-        print("✓ physarum_core.models.model_3d.Model3D import successful")
+        from physarum_core.models.model_3d import Model3DGenerator
+        print("✓ physarum_core.models.model_3d.Model3DGenerator import successful")
     except ImportError as e:
-        print(f"✗ physarum_core.models.model_3d.Model3D import failed: {e}")
-        return False
+        print(f"✗ physarum_core.models.model_3d.Model3DGenerator import failed: {e}")
+        assert False, f"physarum_core.models.model_3d.Model3DGenerator import failed: {e}"
     
     # Test physarum_core.preview import
     try:
@@ -39,7 +39,7 @@ def test_physarum_core_imports():
         print("✓ physarum_core.preview.generator.PreviewGenerator import successful")
     except ImportError as e:
         print(f"✗ physarum_core.preview.generator.PreviewGenerator import failed: {e}")
-        return False
+        assert False, f"physarum_core.preview.generator.PreviewGenerator import failed: {e}"
     
     # Test physarum_core.simulation import
     try:
@@ -47,11 +47,13 @@ def test_physarum_core_imports():
         print("✓ physarum_core.simulation.PhysarumSimulation import successful")
     except ImportError as e:
         print(f"✗ physarum_core.simulation.PhysarumSimulation import failed: {e}")
-        return False
+        assert False, f"physarum_core.simulation.PhysarumSimulation import failed: {e}"
     
     print("✓ All physarum_core imports successful!")
-    return True
 
 if __name__ == "__main__":
-    success = test_physarum_core_imports()
-    exit(0 if success else 1)
+    try:
+        test_physarum_core_imports()
+        exit(0)
+    except Exception:
+        exit(1)

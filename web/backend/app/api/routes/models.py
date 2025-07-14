@@ -61,6 +61,29 @@ async def list_models(
         )
 
 
+@router.get("/statistics", response_model=Dict[str, Any])
+async def get_model_statistics():
+    """Get statistics about registered models."""
+    try:
+        stats = model_registry.get_statistics()
+        
+        return {
+            "success": True,
+            "data": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get model statistics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Internal server error",
+                "message": f"Failed to get statistics: {str(e)}",
+                "error_type": type(e).__name__
+            }
+        )
+
+
 @router.get("/{model_id}", response_model=Dict[str, Any])
 async def get_model(model_id: str):
     """Get detailed information about a specific model."""
@@ -312,29 +335,6 @@ async def scan_models():
             detail={
                 "error": "Internal server error",
                 "message": f"Failed to scan models: {str(e)}",
-                "error_type": type(e).__name__
-            }
-        )
-
-
-@router.get("/statistics", response_model=Dict[str, Any])
-async def get_model_statistics():
-    """Get statistics about registered models."""
-    try:
-        stats = model_registry.get_statistics()
-        
-        return {
-            "success": True,
-            "data": stats
-        }
-        
-    except Exception as e:
-        logger.error(f"Failed to get model statistics: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "Internal server error",
-                "message": f"Failed to get statistics: {str(e)}",
                 "error_type": type(e).__name__
             }
         )

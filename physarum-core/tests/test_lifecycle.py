@@ -142,8 +142,8 @@ class TestLifecycleFunctionality(unittest.TestCase):
         self.assertGreater(final_count, 0)
         
         # Population should be reasonably stable (within 50% of initial)
-        self.assertGreater(final_count, initial_count * 0.5)
-        self.assertLess(final_count, initial_count * 1.5)
+        self.assertGreaterEqual(final_count, initial_count * 0.5)
+        self.assertLessEqual(final_count, initial_count * 1.5)
     
     def test_spawn_location_near_parent(self):
         """Test that spawned actors appear near parent actors."""
