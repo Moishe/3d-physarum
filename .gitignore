@@ -12,5 +12,6 @@ wheels/
 
 data/
 samples/
-output/
 inputs/
+output-files/
+web/backend/output
