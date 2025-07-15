@@ -1,29 +1,57 @@
 {
-  "name": "Node.js",
+  "name": "3D Physarum Dev Environment",
 
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:0-18",
+  // Use a base image that supports both Python and Node.js
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
 
   // Features to add to the dev container. More info: https://containers.dev/features.
-  // "features": {},
-
-  "customizations": {
-    "vscode": {
-      "settings": {},
-      "extensions": ["streetsidesoftware.code-spell-checker"]
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "installTools": ["uv"]
     }
   },
 
-  // "forwardPorts": [3000],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "typescript.preferences.importModuleSpecifier": "relative"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-json",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  },
+
+  // Forward ports for both frontend and backend
+  "forwardPorts": [5173, 8000],
 
   "portsAttributes": {
-    "3000": {
-      "label": "Hello Remote World",
+    "5173": {
+      "label": "Frontend (React)",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "Backend (FastAPI)",
       "onAutoForward": "notify"
     }
   },
 
-  "postCreateCommand": "yarn install"
+  // Install dependencies for both frontend and backend
+  "postCreateCommand": ".devcontainer/scripts/setup.sh",
 
-  // "remoteUser": "root"
+  "remoteUser": "vscode"
 }
