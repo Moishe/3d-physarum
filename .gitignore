@@ -14,4 +14,8 @@ data/
 samples/
 inputs/
 output-files/
+/output/
 web/backend/output
+
+# Editors
+.vscode
