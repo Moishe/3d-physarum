@@ -5,32 +5,10 @@ description = "3D Physarum model generation workspace"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    # Workspace members
+    # Workspace members - their dependencies will be resolved automatically
     "physarum-core",
     "physarum-web-backend",
     "physarum-cli",
-    
-    # Core physarum dependencies
-    "numpy>=1.21.0",
-    "scipy>=1.10.0",
-    "pillow>=8.3.0",
-    "trimesh>=3.15.0",
-    "numpy-stl>=3.1.2",
-    "scikit-image>=0.20.0",
-    
-    # Web backend dependencies
-    "fastapi>=0.115.14",
-    "uvicorn[standard]>=0.34.3",
-    "websockets>=15.0.1",
-    "python-multipart>=0.0.20",
-    "pydantic>=2.11.7",
-    "psutil>=5.9.0",
-    "httpx>=0.24.0",
-    "matplotlib>=3.5.0",
-    "requests>=2.32.4",
-    
-    # CLI dependencies
-    "click>=8.0.0",
 ]
 
 [dependency-groups]
@@ -39,6 +17,10 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.0.0",
     "docker>=6.0.0",
+    # Include dev dependencies from workspace members
+    "physarum-core[dev]",
+    "physarum-web-backend[dev]",
+    "physarum-cli[dev]",
 ]
 
 [tool.uv.workspace]
