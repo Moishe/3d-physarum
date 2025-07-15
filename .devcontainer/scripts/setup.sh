@@ -15,14 +15,14 @@ if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
     # Add uv to PATH for current session
-    export PATH="$HOME/.cargo/bin:$PATH"
+    setup_uv_path
     # Add uv to PATH for future sessions
-    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 fi
 
 # Ensure uv is in PATH
-export PATH="$HOME/.cargo/bin:$PATH"
+setup_uv_path
 
 # Make scripts executable
 chmod +x "$(dirname "${BASH_SOURCE[0]}")"/*.sh
@@ -36,7 +36,7 @@ npm install
 echo "Installing backend dependencies..."
 cd_backend
 # Ensure uv is available
-export PATH="$HOME/.cargo/bin:$PATH"
+setup_uv_path
 uv sync --dev
 
 echo "Setup complete!"

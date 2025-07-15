@@ -3,10 +3,26 @@
 # ABOUTME: Common utility functions for devcontainer scripts
 # ABOUTME: Provides shared directory navigation and path resolution
 
+# Ensure uv is in PATH
+setup_uv_path() {
+    export PATH="$HOME/.local/bin:$PATH"
+}
+
 # Get the absolute path to the project root directory
 get_project_root() {
-    local script_dir="$( cd "$( dirname "${BASH_SOURCE[1]}" )" && pwd )"
-    echo "$script_dir/../.."
+    # Find the .devcontainer directory and navigate to its parent
+    local current_dir="$(pwd)"
+    while [[ "$current_dir" != "/" ]]; do
+        if [[ -d "$current_dir/.devcontainer" ]]; then
+            echo "$current_dir"
+            return 0
+        fi
+        current_dir="$(dirname "$current_dir")"
+    done
+    
+    # Fallback: assume we're in the scripts directory
+    local script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    echo "$( cd "$script_dir/../.." && pwd )"
 }
 
 # Navigate to the project root

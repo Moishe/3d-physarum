@@ -5,7 +5,7 @@ This devcontainer is configured for developing the 3D Physarum simulation projec
 ## What's Included
 
 - **Python 3.11** with uv for dependency management
-- **Node.js 18** for frontend development
+- **Node.js 20** for frontend development
 - **VS Code extensions** for Python, TypeScript, and React development
 - **Port forwarding** for both frontend (5173) and backend (8000)
 - **Automatic dependency installation** on container startup
@@ -79,7 +79,7 @@ If you encounter "uv: command not found" errors, try the following:
 2. **Manual installation**: If uv is still not available, you can manually install it:
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
-   export PATH="$HOME/.cargo/bin:$PATH"
+   export PATH="$HOME/.local/bin:$PATH"
    ```
 
 3. **Check PATH**: Verify that uv is in your PATH:

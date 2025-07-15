@@ -8,6 +8,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 cd_backend
 # Ensure uv is available
-export PATH="$HOME/.cargo/bin:$PATH"
+setup_uv_path
 echo "Starting backend server..."
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

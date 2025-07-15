@@ -7,7 +7,7 @@
   // Features to add to the dev container. More info: https://containers.dev/features.
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "18"
+      "version": "20"
     },
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
@@ -51,7 +51,7 @@
   "postCreateCommand": ".devcontainer/scripts/setup.sh",
 
   // Ensure uv is in PATH for all terminal sessions
-  "postStartCommand": "grep -q 'export PATH=\"$HOME/.cargo/bin:$PATH\"' ~/.bashrc || echo 'export PATH=\"$HOME/.cargo/bin:$PATH\"' >> ~/.bashrc; grep -q 'export PATH=\"$HOME/.cargo/bin:$PATH\"' ~/.zshrc || echo 'export PATH=\"$HOME/.cargo/bin:$PATH\"' >> ~/.zshrc",
+  "postStartCommand": "grep -q 'export PATH=\"$HOME/.local/bin:$PATH\"' ~/.bashrc || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; grep -q 'export PATH=\"$HOME/.local/bin:$PATH\"' ~/.zshrc || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc",
 
   "remoteUser": "vscode"
 }

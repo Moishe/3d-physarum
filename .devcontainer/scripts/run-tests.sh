@@ -7,7 +7,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 # Ensure uv is available
-export PATH="$HOME/.cargo/bin:$PATH"
+setup_uv_path
 
 EXIT_CODE=0
 
