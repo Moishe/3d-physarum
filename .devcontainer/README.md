@@ -7,8 +7,9 @@ This devcontainer is configured for developing the 3D Physarum simulation projec
 - **Python 3.11** with uv for dependency management
 - **Node.js 18** for frontend development
 - **VS Code extensions** for Python, TypeScript, and React development
-- **Port forwarding** for both frontend (3000) and backend (8000)
+- **Port forwarding** for both frontend (5173) and backend (8000)
 - **Automatic dependency installation** on container startup
+- **Automatic uv installation** if not already present
 
 ## Quick Start
 
@@ -66,3 +67,25 @@ The devcontainer automatically forwards these ports:
 - **8000**: Backend API server (FastAPI)
 
 Both will be accessible from your local machine at `http://localhost:[port]`.
+
+## Troubleshooting
+
+### uv command not found
+
+If you encounter "uv: command not found" errors, try the following:
+
+1. **Reload your shell**: Open a new terminal tab or run `source ~/.bashrc` (or `source ~/.zshrc` if using zsh)
+
+2. **Manual installation**: If uv is still not available, you can manually install it:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   export PATH="$HOME/.cargo/bin:$PATH"
+   ```
+
+3. **Check PATH**: Verify that uv is in your PATH:
+   ```bash
+   echo $PATH
+   which uv
+   ```
+
+The devcontainer setup script automatically installs uv and adds it to your PATH, but sometimes you may need to reload your shell to pick up the changes.

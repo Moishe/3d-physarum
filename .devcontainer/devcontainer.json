@@ -13,9 +13,6 @@
       "installZsh": true,
       "installOhMyZsh": true,
       "upgradePackages": true
-    },
-    "ghcr.io/devcontainers/features/python:1": {
-      "installTools": ["uv"]
     }
   },
 
@@ -52,6 +49,9 @@
 
   // Install dependencies for both frontend and backend
   "postCreateCommand": ".devcontainer/scripts/setup.sh",
+
+  // Ensure uv is in PATH for all terminal sessions
+  "postStartCommand": "grep -q 'export PATH=\"$HOME/.cargo/bin:$PATH\"' ~/.bashrc || echo 'export PATH=\"$HOME/.cargo/bin:$PATH\"' >> ~/.bashrc; grep -q 'export PATH=\"$HOME/.cargo/bin:$PATH\"' ~/.zshrc || echo 'export PATH=\"$HOME/.cargo/bin:$PATH\"' >> ~/.zshrc",
 
   "remoteUser": "vscode"
 }
