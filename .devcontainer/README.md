@@ -68,7 +68,29 @@ The devcontainer automatically forwards these ports:
 
 Both will be accessible from your local machine at `http://localhost:[port]`.
 
+## Testing
+
+The development container is pre-configured to work with pytest out of the box:
+
+- **Test Discovery**: VSCode will automatically discover tests using pytest
+- **Python Interpreter**: Configured to use the uv virtual environment (`/workspaces/3d-physarum/.venv/bin/python`)
+- **Test Runner**: Uses pytest from the virtual environment for accurate dependency resolution
+
+To run tests:
+- Use VSCode's test discovery UI (Testing sidebar)
+- Run `uv run pytest` from the terminal
+- Use the `scripts/run-tests.sh` script
+
 ## Troubleshooting
+
+### pytest/Test Discovery Issues
+
+If you encounter issues with test discovery in VSCode:
+
+1. **Check Python interpreter**: Ensure the Python interpreter is set to `/workspaces/3d-physarum/.venv/bin/python`
+2. **Verify pytest installation**: Run `uv run pytest --version` to ensure pytest is installed in the virtual environment
+3. **Reload VSCode**: Use "Developer: Reload Window" from the Command Palette
+4. **Check paths**: Ensure you're working from the correct directory (`/workspaces/3d-physarum`)
 
 ### uv command not found
 

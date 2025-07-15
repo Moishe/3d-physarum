@@ -10,6 +10,12 @@ wheels/
 .venv
 .claude/
 
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
 data/
 samples/
 inputs/
@@ -18,4 +24,5 @@ output-files/
 web/backend/output
 
 # Editors
-.vscode
+.vscode/launch.json
+.vscode/tasks.json

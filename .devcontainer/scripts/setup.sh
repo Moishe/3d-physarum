@@ -31,6 +31,10 @@ chmod +x "$(dirname "${BASH_SOURCE[0]}")"/*.sh
 cd_project_root
 cleanup_venv
 
+# Install root project dependencies (this will create the virtual environment)
+echo "Installing root project dependencies..."
+uv sync --dev
+
 # Install frontend dependencies
 echo "Installing frontend dependencies..."
 cd_frontend

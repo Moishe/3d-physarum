@@ -19,7 +19,14 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "/workspaces/3d-physarum/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "."
+        ],
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestPath": "/workspaces/3d-physarum/.venv/bin/pytest",
         "typescript.preferences.importModuleSpecifier": "relative"
       },
       "extensions": [
@@ -50,8 +57,8 @@
   // Install dependencies for both frontend and backend
   "postCreateCommand": ".devcontainer/scripts/setup.sh",
 
-  // Ensure uv is in PATH for all terminal sessions
-  "postStartCommand": "grep -q 'export PATH=\"$HOME/.local/bin:$PATH\"' ~/.bashrc || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.bashrc; grep -q 'export PATH=\"$HOME/.local/bin:$PATH\"' ~/.zshrc || echo 'export PATH=\"$HOME/.local/bin:$PATH\"' >> ~/.zshrc",
+  // Ensure dependencies are synced on container start
+  "postStartCommand": "cd /workspaces/3d-physarum && source .devcontainer/scripts/common.sh && setup_uv_path && uv sync --dev",
 
   "remoteUser": "vscode"
 }
