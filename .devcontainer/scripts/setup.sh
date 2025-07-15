@@ -27,6 +27,10 @@ setup_uv_path
 # Make scripts executable
 chmod +x "$(dirname "${BASH_SOURCE[0]}")"/*.sh
 
+# Clean up any existing virtual environment in the root directory
+cd_project_root
+cleanup_venv
+
 # Install frontend dependencies
 echo "Installing frontend dependencies..."
 cd_frontend
@@ -37,6 +41,10 @@ echo "Installing backend dependencies..."
 cd_backend
 # Ensure uv is available
 setup_uv_path
+
+# Clean up any existing virtual environment to avoid conflicts
+cleanup_venv
+
 uv sync --dev
 
 echo "Setup complete!"

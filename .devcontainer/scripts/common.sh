@@ -8,6 +8,16 @@ setup_uv_path() {
     export PATH="$HOME/.local/bin:$PATH"
 }
 
+# Clean up any existing virtual environment to avoid conflicts
+cleanup_venv() {
+    if [ -d ".venv" ]; then
+        echo "Removing existing virtual environment to ensure clean setup..."
+        rm -rf .venv || {
+            echo "Warning: Failed to remove virtual environment, continuing..."
+        }
+    fi
+}
+
 # Get the absolute path to the project root directory
 get_project_root() {
     # Find the .devcontainer directory and navigate to its parent
