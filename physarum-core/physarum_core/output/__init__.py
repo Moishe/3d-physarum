@@ -1,5 +1,5 @@
-# ABOUTME: Output management module for physarum-core package
-# ABOUTME: Provides file handling and metadata creation functionality
+# ABOUTME: Output module initialization for physarum_core package
+# ABOUTME: Exports OutputManager class for use by other modules
 
 from .manager import OutputManager
 
