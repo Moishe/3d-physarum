@@ -10,14 +10,12 @@ Github repo: https://github.com/Moishe/3d-physarum
 
 ## Process
 
-I didn’t use much of Sculptor’s parallelism when developing this project, the basic steps I took were:
-
 - Describe what I wanted (a command line tool that runs the slime mold simulation and creates an .STL file suitable for 3D printing) and ask it to create a [TODO file](https://github.com/Moishe/3d-physarum/blob/main/TODO.md)
 - Sequentially ask it to implement sections of the TODO
 - Play around with the command line utility and ask it to add features, such as:
     - better smoothing. This was a neat one because, unlike the simulation which I’m very familiar with, I didn’t have the vocabulary to describe what I wanted to implement. So at first I ended up with a “smoothed” model that looked pretty bad; the pixelation was still visible. But I was able to iterate with Sculptor/Claude and give it more details about what I actually wanted and it eventually ended up producing fairly nice results. Here’s an example of the first kind of smoothing it implemented alongside the better algorithm it got to:
         
-        ![Screenshot 2025-06-28 at 4.51.36 PM.png](A%20Sculpture%20made%20with%20Sculptor%20that%20makes%20Sculptur%20220a550faf9580d1976fe295373721dc/Screenshot_2025-06-28_at_4.51.36_PM.png)
+        ![Screenshot 2025-06-28 at 4.51.36 PM.png](resources/Screenshot_2025-06-28_at_4.51.36_PM.png)
         
     - Ability to specify an input bitmap to use for the original colony. This was a fun one and worked well with better smoothing. I mainly used it with text. Here’s an early print from a 3D model it generated, using different color filament at different layers (I set up the coloring manually in my printer slicing program):
         
